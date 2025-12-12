@@ -1,18 +1,319 @@
-<!DOCTYPE html>
-<html>
-
-<head>
+<!DOCTYPE html><html lang="fr"><head>
     <meta charset="UTF-8">
-    <title>Blueprint JS - Floorplan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blueprint JS - Floorplan Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="/visual-editor-archi.cf673764.css" rel="stylesheet">
 </head>
 
 <body>
+    <!-- Main App Container -->
     <div id="bp3d-js-app">
+        <!-- Viewers -->
         <div id="bp3djs-viewer2d"></div>
         <div id="bp3djs-viewer3d"></div>
-    </div>
-    <link href="/index.cf673764.css" rel="stylesheet">
-    <script src="/index.0af55655.js" defer=""></script>
-</body>
 
-</html>
+        <!-- Top Toolbar -->
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <div class="logo">
+                    <span class="logo-icon material-icons-round">architecture</span>
+                    <span class="logo-text">Blueprint<span class="logo-accent">JS</span></span>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="view-switcher">
+                    <button id="btn-view-2d" class="view-btn active" title="Vue 2D (Plan)">
+                        <span class="material-icons-round">grid_on</span>
+                        <span>2D</span>
+                    </button>
+                    <button id="btn-view-3d" class="view-btn" title="Vue 3D">
+                        <span class="material-icons-round">view_in_ar</span>
+                        <span>3D</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-center">
+                <!-- 2D Mode Tools -->
+                <div id="tools-2d" class="tool-group">
+                    <button id="btn-draw" class="tool-btn active" title="Mode Dessin">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                    <button id="btn-move" class="tool-btn" title="Mode Deplacement">
+                        <span class="material-icons-round">open_with</span>
+                    </button>
+                    <button id="btn-transform" class="tool-btn" title="Mode Transformation">
+                        <span class="material-icons-round">transform</span>
+                    </button>
+                    <div class="toolbar-divider"></div>
+                    <button id="btn-delete" class="tool-btn danger" title="Supprimer" disabled="">
+                        <span class="material-icons-round">delete</span>
+                    </button>
+                </div>
+                <!-- 3D Mode Tools (hidden by default) -->
+                <div id="tools-3d" class="tool-group hidden">
+                    <span class="tool-hint">
+                        <span class="material-icons-round">touch_app</span>
+                        Cliquez sur un mur ou le sol pour modifier les textures
+                    </span>
+                </div>
+            </div>
+
+            <div class="toolbar-right">
+                <button id="btn-load" class="action-btn" title="Charger un design">
+                    <span class="material-icons-round">folder_open</span>
+                </button>
+                <input type="file" id="file-input" accept=".blueprint3d" hidden="">
+                <div class="toolbar-divider"></div>
+                <button id="btn-reset" class="action-btn danger" title="Reinitialiser">
+                    <span class="material-icons-round">restart_alt</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Right Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <!-- 2D Settings Panel -->
+            <div id="panel-2d" class="panel">
+                <!-- Add Door/Window Section -->
+                <div class="panel-section">
+                    <div class="panel-header">
+                        <span class="material-icons-round">add_circle</span>
+                        <span>Ajouter elements</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="element-buttons">
+                            <button id="btn-add-door-2d" class="element-btn" title="Ajouter une porte">
+                                <svg class="element-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="4" y="2" width="16" height="20" rx="1"></rect>
+                                    <path d="M14 2v20"></path>
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <path d="M4 22 Q4 12, 14 12" stroke-dasharray="2,2"></path>
+                                </svg>
+                                <span>Porte</span>
+                            </button>
+                            <button id="btn-add-window-2d" class="element-btn" title="Ajouter une fenetre">
+                                <svg class="element-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="16" rx="1"></rect>
+                                    <line x1="12" y1="4" x2="12" y2="20"></line>
+                                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                                </svg>
+                                <span>Fenetre</span>
+                            </button>
+                        </div>
+                        <p class="hint-text" id="add-element-hint">Selectionnez un mur en vue 3D pour ajouter l'element</p>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-header">
+                        <span class="material-icons-round">settings</span>
+                        <span>Options de grille</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label class="toggle-label">
+                                <span>Snap to Grid</span>
+                                <input type="checkbox" id="opt-snap" checked="">
+                                <span class="toggle"></span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="toggle-label">
+                                <span>Drag directionnel</span>
+                                <input type="checkbox" id="opt-directional">
+                                <span class="toggle"></span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Espacement grille</label>
+                            <div class="range-input">
+                                <input type="range" id="opt-grid-spacing" min="10" max="200" value="50">
+                                <span class="range-value">50</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Tolerance snap</label>
+                            <div class="range-input">
+                                <input type="range" id="opt-snap-tolerance" min="1" max="200" value="50">
+                                <span class="range-value">50</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Corner Properties (hidden by default) -->
+                <div id="props-corner" class="panel-section hidden">
+                    <div class="panel-header">
+                        <span class="material-icons-round">radio_button_checked</span>
+                        <span>Coin selectionne</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Elevation (cm)</label>
+                            <input type="number" id="corner-elevation" class="input" value="250">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wall Properties (hidden by default) -->
+                <div id="props-wall" class="panel-section hidden">
+                    <div class="panel-header">
+                        <span class="material-icons-round">straighten</span>
+                        <span>Mur selectionne</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Epaisseur (m)</label>
+                            <input type="number" id="wall-thickness" class="input" step="0.01" value="0.2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Room Properties (hidden by default) -->
+                <div id="props-room" class="panel-section hidden">
+                    <div class="panel-header">
+                        <span class="material-icons-round">meeting_room</span>
+                        <span>Piece selectionnee</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Nom de la piece</label>
+                            <input type="text" id="room-name" class="input" placeholder="Salon, Chambre...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3D Settings Panel (hidden by default) -->
+            <div id="panel-3d" class="panel hidden">
+                <!-- Wall 3D Properties -->
+                <div id="props-wall-3d" class="panel-section hidden">
+                    <div class="panel-header">
+                        <span class="material-icons-round">texture</span>
+                        <span>Texture du mur</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Texture</label>
+                            <select id="wall-texture" class="select"></select>
+                        </div>
+                        <div class="texture-preview">
+                            <img id="wall-texture-preview" alt="Apercu texture">
+                        </div>
+                        <div class="form-group">
+                            <label>Teinte</label>
+                            <input type="color" id="wall-texture-color" class="color-input" value="#FFFFFF">
+                        </div>
+                        <button id="btn-apply-wall-texture" class="btn btn-primary">
+                            <span class="material-icons-round">check</span>
+                            Appliquer
+                        </button>
+                    </div>
+
+                    <div class="panel-header" style="margin-top: 16px">
+                        <span class="material-icons-round">door_front</span>
+                        <span>Ajouter une porte</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Type de porte</label>
+                            <select id="door-type" class="select"></select>
+                        </div>
+                        <div class="texture-preview">
+                            <img id="door-preview" alt="Apercu porte">
+                        </div>
+                        <button id="btn-add-door" class="btn btn-secondary">
+                            <span class="material-icons-round">add</span>
+                            Ajouter la porte
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Room 3D Properties -->
+                <div id="props-room-3d" class="panel-section hidden">
+                    <div class="panel-header">
+                        <span class="material-icons-round">layers</span>
+                        <span>Texture du sol</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Texture</label>
+                            <select id="floor-texture" class="select"></select>
+                        </div>
+                        <div class="texture-preview">
+                            <img id="floor-texture-preview" alt="Apercu texture">
+                        </div>
+                        <div class="form-group">
+                            <label>Teinte</label>
+                            <input type="color" id="floor-texture-color" class="color-input" value="#FFFFFF">
+                        </div>
+                        <button id="btn-apply-floor-texture" class="btn btn-primary">
+                            <span class="material-icons-round">check</span>
+                            Appliquer au sol
+                        </button>
+                    </div>
+
+                    <div class="panel-header" style="margin-top: 16px">
+                        <span class="material-icons-round">wallpaper</span>
+                        <span>Texture des murs (piece)</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Texture</label>
+                            <select id="room-wall-texture" class="select"></select>
+                        </div>
+                        <div class="texture-preview">
+                            <img id="room-wall-texture-preview" alt="Apercu texture">
+                        </div>
+                        <div class="form-group">
+                            <label>Teinte</label>
+                            <input type="color" id="room-wall-texture-color" class="color-input" value="#FFFFFF">
+                        </div>
+                        <button id="btn-apply-room-walls-texture" class="btn btn-primary">
+                            <span class="material-icons-round">check</span>
+                            Appliquer a tous les murs
+                        </button>
+                    </div>
+                </div>
+
+                <!-- No Selection Message -->
+                <div id="no-selection-3d" class="panel-section">
+                    <div class="empty-state">
+                        <span class="material-icons-round">touch_app</span>
+                        <p>Cliquez sur un mur ou le sol pour modifier ses proprietes</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span id="status-mode" class="status-item">
+                    <span class="material-icons-round">edit</span>
+                    Mode: Dessin
+                </span>
+                <span id="status-unit" class="status-item">
+                    <span class="material-icons-round">straighten</span>
+                    Unite: Metres
+                </span>
+            </div>
+            <div class="status-right">
+                <select id="unit-select" class="status-select">
+                    <option value="m">Metres (m)</option>
+                    <option value="cm">Centimetres (cm)</option>
+                    <option value="ft">Pieds (ft)</option>
+                    <option value="inch">Pouces (in)</option>
+                </select>
+                <span id="fps-counter" class="status-item">60 FPS</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/visual-editor-archi.982d5ed5.js" type="module"></script>
+
+
+
+</body></html>

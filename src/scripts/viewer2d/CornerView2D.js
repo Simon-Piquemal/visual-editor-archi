@@ -13,7 +13,7 @@ import { isMobile } from 'detect-touch-device';
 export class CornerView2D extends BaseFloorplanViewElement2D {
     constructor(floorplan, options, corner) {
         super(floorplan, options);
-        this.__options['corner-radius'] = 12.5;
+        this.__options['corner-radius'] = 6;
         for (var opt in options) {
             if (this.__options.hasOwnProperty(opt) && options.hasOwnProperty(opt)) {
                 this.__options[opt] = options[opt];
@@ -40,41 +40,48 @@ export class CornerView2D extends BaseFloorplanViewElement2D {
         this.__updateWithModel();
     }
 
-    __drawCornerState(radius, borderColor, fillColor) {
+    __drawCornerState(radius, borderColor, fillColor, isSelected = false) {
         this.clear();
-        let alpha = 0.5;//1.0;//
         let useRadius = (isMobile) ? radius * 2.5 : radius;
-        let insideRadius = useRadius * 0.55;
-        let xOut = 0;//useRadius * 0.5;//
-        let yOut = 0;//useRadius * 0.5;//
-        // if (isMobile) {
-        //     useRadius = radius * 2.5;
-        //     // this.beginFill(borderColor, alpha);
-        //     // this.drawCircle(0, 0, useRadius);
-        //     // this.endFill();
-        // }
-        this.beginFill(borderColor, alpha);
-        this.drawCircle(xOut, yOut, useRadius);
+        let insideRadius = useRadius * 0.5;
+
+        // Modern style with clean look
+        if (isSelected) {
+            // Glow effect for selected
+            this.beginFill(borderColor, 0.2);
+            this.drawCircle(0, 0, useRadius * 1.5);
+            this.endFill();
+        }
+
+        // Outer ring
+        this.lineStyle(2, borderColor, 1.0);
+        this.beginFill(fillColor, 1.0);
+        this.drawCircle(0, 0, useRadius);
         this.endFill();
-        this.beginFill(fillColor, alpha);
-        this.drawCircle(xOut, yOut, insideRadius);
+
+        // Inner dot
+        this.beginFill(0xFFFFFF, 1.0);
+        this.drawCircle(0, 0, insideRadius);
         this.endFill();
     }
 
     __drawSelectedState() {
         super.__drawSelectedState();
         let radius = this.__options['corner-radius'];
-        this.__drawCornerState(radius, 0x04A9F5, 0x049995);
+        // Purple accent for selected
+        this.__drawCornerState(radius, 0x6366F1, 0x6366F1, true);
     }
     __drawHoveredOnState() {
         super.__drawHoveredOnState();
         let radius = this.__options['corner-radius'] * 1.0;
-        this.__drawCornerState(radius, 0x000000, 0x04A9F5);
+        // Lighter purple for hover
+        this.__drawCornerState(radius, 0x818CF8, 0x818CF8, false);
     }
     __drawHoveredOffState() {
         super.__drawHoveredOffState();
         let radius = this.__options['corner-radius'];
-        this.__drawCornerState(radius, 0xCCCCCC, 0x000000);
+        // Dark gray for normal state
+        this.__drawCornerState(radius, 0x6B7280, 0x374151, false);
     }
 
     __updateWithModel() {

@@ -5,11 +5,12 @@ import { Graphics, Text, Point } from 'pixi.js';
 import { Vector3, Vector2, Color } from 'three';
 import { Configuration, snapToGrid, snapTolerance, dragOnlyX, dragOnlyY, directionalDrag } from '../core/configuration.js';
 import { isMobile } from 'detect-touch-device';
+import { InWallItemView2D } from './InWallItemView2D.js';
 
 export class WallDimensions2D extends Graphics {
     constructor(floorplan, options, wall) {
         super();
-        var opts = { dimlinecolor: '#3EDEDE', dimarrowcolor: '#000000', dimtextcolor: '#000000', };
+        var opts = { dimlinecolor: '#6366F1', dimarrowcolor: '#6366F1', dimtextcolor: '#374151', };
         for (var opt in opts) {
             if (opts.hasOwnProperty(opt) && options.hasOwnProperty(opt)) {
                 opts[opt] = options[opt];
@@ -22,7 +23,13 @@ export class WallDimensions2D extends Graphics {
         this.__floorplan = floorplan;
         this.__options = opts;
         this.__wall = wall;
-        this.__textfield = new Text('Length: ', { fontFamily: 'Arial', fontSize: 14, fill: this.__options.dimtextcolor, align: 'center' });
+        this.__textfield = new Text('Length: ', {
+            fontFamily: 'Inter, Arial, sans-serif',
+            fontSize: 12,
+            fontWeight: '600',
+            fill: this.__options.dimtextcolor,
+            align: 'center'
+        });
         this.__textfield.anchor.set(0.5, 0.5);
         this.interactive = this.__textfield.interactive = false;
         this.__measurementUpdateEvent = this.__measurementUpdate.bind(this);
@@ -321,6 +328,8 @@ export class WallView2D extends BaseFloorplanViewElement2D {
         this.__frontEdge = null;
         this.__backEdge = null;
         this.__info = new WallDimensions2D(floorplan, options, wall);
+        this.__inWallItemsOverlay = new Graphics();
+        this.__inWallItemViews = [];
         this.viewDimensions = false;
 
         this.interactive = wall.isLocked;
@@ -347,7 +356,12 @@ export class WallView2D extends BaseFloorplanViewElement2D {
             this.addChild(this.__frontEdge);
         }
         this.addChild(this.__info);
+        this.addChild(this.__inWallItemsOverlay);
         this.__mouseOut();
+    }
+
+    get inWallItemsOverlay() {
+        return this.__inWallItemsOverlay;
     }
 
     get viewDimensions() {
@@ -369,37 +383,32 @@ export class WallView2D extends BaseFloorplanViewElement2D {
     }
 
     __drawInWallItems() {
-        this.lineStyle(0, 0xF0F0F0);
         let inWallItems = this.__wall.inWallItems;
-        // let depth = this.__wall.thickness * 0.5;
-        let wallDirection = this.__wall.wallDirectionNormalized();
+
+        // Remove old views that no longer exist
+        for (let i = this.__inWallItemViews.length - 1; i >= 0; i--) {
+            let view = this.__inWallItemViews[i];
+            let found = inWallItems.find(item => item.id === view.item.id);
+            if (!found) {
+                view.remove();
+                this.__inWallItemViews.splice(i, 1);
+            }
+        }
+
+        // Add new views or update existing
         for (let i = 0; i < inWallItems.length; i++) {
             let item = inWallItems[i];
-            let pos = new Vector2(item.position.x, item.position.z);
-            let width = item.halfSize.x;
-            let depth = item.halfSize.z;
+            let existingView = this.__inWallItemViews.find(v => v.item.id === item.id);
 
-            let right = wallDirection.clone().multiplyScalar(width);
-            let left = wallDirection.clone().multiplyScalar(width).multiplyScalar(-1);
-            let up = wallDirection.clone().rotateAround(new Vector2(), Math.PI * 0.5).multiplyScalar(depth);
-            let down = up.clone().multiplyScalar(-1);
-
-            let a = pos.clone().add(right.clone().add(up));
-            let b = pos.clone().add(right.clone().sub(up));
-            let c = pos.clone().add(left.clone().add(down));
-            let d = pos.clone().add(left.clone().sub(down));
-
-            let points = [
-                new Point(Dimensioning.cmToPixel(a.x), Dimensioning.cmToPixel(a.y)),
-                new Point(Dimensioning.cmToPixel(b.x), Dimensioning.cmToPixel(b.y)),
-                new Point(Dimensioning.cmToPixel(c.x), Dimensioning.cmToPixel(c.y)),
-                new Point(Dimensioning.cmToPixel(d.x), Dimensioning.cmToPixel(d.y)),
-            ];
-
-            this.beginFill(0x0000F0, 0.85);
-            this.drawPolygon(points);
-            this.endFill();
+            if (!existingView) {
+                let itemView = new InWallItemView2D(this.__floorplan, this.__wall, item);
+                this.__inWallItemViews.push(itemView);
+                this.addChild(itemView);
+            }
         }
+
+        // Clear the static overlay (we use individual views now)
+        this.__inWallItemsOverlay.clear();
     }
 
     __drawPolygon(color = 0xDDDDDD, alpha = 1.0) {
@@ -427,25 +436,16 @@ export class WallView2D extends BaseFloorplanViewElement2D {
     }
 
     __drawSelectedState() {
-        // if (this.__frontEdge) {
-        //     this.__frontEdge.debugMode = true;
-        // }
-        // if (this.__backEdge) {
-        //     this.__backEdge.debugMode = true;
-        // }
-        this.__drawPolygon(0x049995, 1.0);
+        // Modern purple accent for selected state
+        this.__drawPolygon(0x6366F1, 1.0);
     }
     __drawHoveredOnState() {
-        this.__drawPolygon(0x04A9F5, 1.0);
+        // Lighter purple for hover
+        this.__drawPolygon(0x818CF8, 1.0);
     }
     __drawHoveredOffState() {
-        // if (this.__frontEdge) {
-        //     this.__frontEdge.debugMode = false;
-        // }
-        // if (this.__backEdge) {
-        //     this.__backEdge.debugMode = false;
-        // }
-        this.__drawPolygon(0x000000, 1.0);
+        // Dark gray for normal state - more visible
+        this.__drawPolygon(0x374151, 1.0);
     }
 
     __getCornerLocation(vec2){
@@ -523,6 +523,13 @@ export class WallView2D extends BaseFloorplanViewElement2D {
         this.__wall.removeEventListener(EVENT_UPDATED, this.__wallUpdatedEvent);
         this.__wall.removeEventListener(EVENT_DELETED, this.__wallDeletedEvent);
         this.removeChild(this.__info);
+
+        // Clean up in-wall item views
+        for (let view of this.__inWallItemViews) {
+            view.remove();
+        }
+        this.__inWallItemViews = [];
+
         super.remove();
     }
 

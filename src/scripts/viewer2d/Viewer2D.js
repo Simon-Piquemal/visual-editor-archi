@@ -19,8 +19,14 @@ export const floorplannerModes = { MOVE: 0, DRAW: 1, EDIT_ISLANDS: 2 };
 class TemporaryWall extends Graphics {
     constructor() {
         super();
-        this.__textfield = new Text('Length: ', { fontFamily: 'Arial', fontSize: 14, fill: "black", align: 'center' });
-        // this.__textfield.pivot.x = this.__textfield.pivot.y = 0.5;
+        this.__textfield = new Text('Length: ', {
+            fontFamily: 'Inter, Arial, sans-serif',
+            fontSize: 12,
+            fontWeight: '600',
+            fill: '#FFFFFF',
+            align: 'center'
+        });
+        this.__textfield.anchor.set(0.5, 0.5);
         this.addChild(this.__textfield);
     }
 
@@ -33,18 +39,52 @@ class TemporaryWall extends Graphics {
     update(corner, endPoint, startPoint) {
         this.clear();
         this.__textfield.visible = false;
+
+        // Modern accent color (purple)
+        const accentColor = 0x6366F1;
+        const accentColorLight = 0x818CF8;
+
         if (corner !== undefined && endPoint !== undefined) {
             let pxCornerCo = this.__toPixels(corner.location.clone());
             let pxEndPoint = this.__toPixels(endPoint.clone());
             let vect = endPoint.clone().sub(corner.location);
-            let midPoint = (pxEndPoint.clone().sub(pxCornerCo).multiplyScalar(0.5)).add(pxCornerCo);;
+            let midPoint = (pxEndPoint.clone().sub(pxCornerCo).multiplyScalar(0.5)).add(pxCornerCo);
 
-            this.lineStyle(10, 0x008CBA);
+            // Draw wall line with glow effect
+            this.lineStyle(12, accentColorLight, 0.3);
             this.moveTo(pxCornerCo.x, pxCornerCo.y);
             this.lineTo(pxEndPoint.x, pxEndPoint.y);
 
-            this.beginFill(0x008CBA, 0.5);
-            this.drawCircle(pxEndPoint.x, pxEndPoint.y, 10);
+            this.lineStyle(6, accentColor, 0.9);
+            this.moveTo(pxCornerCo.x, pxCornerCo.y);
+            this.lineTo(pxEndPoint.x, pxEndPoint.y);
+
+            // End point indicator
+            this.lineStyle(1.5, accentColor, 1.0);
+            this.beginFill(accentColor, 0.9);
+            this.drawCircle(pxEndPoint.x, pxEndPoint.y, 5);
+            this.endFill();
+            this.beginFill(0xFFFFFF, 1.0);
+            this.drawCircle(pxEndPoint.x, pxEndPoint.y, 2.5);
+            this.endFill();
+
+            // Start point indicator
+            this.beginFill(accentColor, 0.9);
+            this.drawCircle(pxCornerCo.x, pxCornerCo.y, 4);
+            this.endFill();
+
+            // Text background pill
+            let textWidth = 60;
+            let textHeight = 22;
+            this.beginFill(accentColor, 0.95);
+            this.drawRoundedRect(
+                midPoint.x - textWidth / 2,
+                midPoint.y - textHeight / 2,
+                textWidth,
+                textHeight,
+                textHeight / 2
+            );
+            this.endFill();
 
             this.__textfield.position.x = midPoint.x;
             this.__textfield.position.y = midPoint.y;
@@ -53,8 +93,17 @@ class TemporaryWall extends Graphics {
         }
         if (startPoint !== undefined) {
             let pxStartCo = this.__toPixels(startPoint);
-            this.beginFill(0x008cba, 0.5);
+            // Pulsing start point indicator
+            this.lineStyle(1.5, accentColor, 0.5);
+            this.beginFill(accentColor, 0.3);
             this.drawCircle(pxStartCo.x, pxStartCo.y, 10);
+            this.endFill();
+            this.beginFill(accentColor, 0.8);
+            this.drawCircle(pxStartCo.x, pxStartCo.y, 5);
+            this.endFill();
+            this.beginFill(0xFFFFFF, 1.0);
+            this.drawCircle(pxStartCo.x, pxStartCo.y, 2.5);
+            this.endFill();
         }
     }
 }

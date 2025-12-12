@@ -63,7 +63,7 @@ class BlueprintJS {
             let viewer2dOptions = this.options.viewer2d.viewer2dOptions || {};
             viewer2dOptions.resize = (this.options.resize) ? true : false;
             this.floorplanner = new Viewer2D(options.viewer2d.id, this.model.floorplan, viewer2dOptions);
-            this.floorplanningHelper = new FloorPlannerHelper(this.model.floorplan, this.floorplanner);
+            this.floorplanningHelper = new FloorPlannerHelper(this.model.floorplan, this.floorplanner, this.model);
         }
 
         this.view_now = 3;

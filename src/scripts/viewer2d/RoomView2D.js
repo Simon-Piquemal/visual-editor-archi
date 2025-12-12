@@ -11,11 +11,23 @@ export class RoomView2D extends BaseFloorplanViewElement2D {
         this.__room = room;
         this.__updatedRoomEvent = this.__drawUpdatedRoom.bind(this);
 
-        this.__roomNameField = new Text('Room Name ', { fontFamily: 'Arial', fontSize: 14, fill: '#000000', align: 'left' });
-        this.__roomAreaField = new Text('Room Area ', { fontFamily: 'Arial', fontSize: 14, fill: '#000000', align: 'left' });
+        this.__roomNameField = new Text('Room Name ', {
+            fontFamily: 'Inter, Arial, sans-serif',
+            fontSize: 14,
+            fontWeight: '600',
+            fill: '#1F2937',
+            align: 'center'
+        });
+        this.__roomAreaField = new Text('Room Area ', {
+            fontFamily: 'Inter, Arial, sans-serif',
+            fontSize: 12,
+            fontWeight: '500',
+            fill: '#6B7280',
+            align: 'center'
+        });
 
-        this.__roomAreaField.alpha = 0.5;
-        this.__roomNameField.alpha = 0.5;
+        this.__roomAreaField.alpha = 0.9;
+        this.__roomNameField.alpha = 0.9;
 
         this.interactive = room.isLocked;
         this.buttonMode = room.isLocked;
@@ -80,13 +92,16 @@ export class RoomView2D extends BaseFloorplanViewElement2D {
     }
 
     __drawSelectedState() {
-        this.__drawPolygon(0x00BA8C, 1.0);
+        // Modern purple accent - subtle
+        this.__drawPolygon(0x6366F1, 0.08);
     }
     __drawHoveredOnState() {
-        this.__drawPolygon(0x008CBA, 1.0);
+        // Lighter purple for hover - subtle
+        this.__drawPolygon(0x818CF8, 0.06);
     }
     __drawHoveredOffState() {
-        this.__drawPolygon(0xFEDAFF, 1.0);
+        // Very subtle fill - almost transparent
+        this.__drawPolygon(0xF3F4F6, 0.15);
     }
 
     remove() {

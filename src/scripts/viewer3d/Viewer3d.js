@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { WebGLRenderer, PerspectiveCamera, AxesHelper, Scene, RGBFormat, LinearMipmapLinearFilter, sRGBEncoding } from 'three';
-import { PCFSoftShadowMap, WebGLCubeRenderTarget, CubeCamera, MathUtils, NoToneMapping } from 'three';
+import { PCFSoftShadowMap, WebGLCubeRenderTarget, CubeCamera, MathUtils, NoToneMapping, ACESFilmicToneMapping } from 'three';
+import { Color, Fog, AmbientLight, DirectionalLight, HemisphereLight } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 import {
@@ -101,22 +102,27 @@ export class Viewer3D extends Scene {
         scope.renderer = scope.getARenderer();
         scope.domElement.appendChild(scope.renderer.domElement);
 
+        // Setup modern lighting and fog
+        scope.__setupLightingAndFog();
+
         scope.dragcontrols = new DragRoomItemsControl3D(this.floorplan.wallPlanesForIntersection, this.floorplan.floorPlanesForIntersection, this.physicalRoomItems, scope, scope.renderer.domElement);
         scope.controls = new OrbitControls(scope.camera, scope.domElement);
 
-        // scope.controls.autoRotate = this.__options['spin'];
-        scope.controls.enableDamping = false;
-        scope.controls.dampingFactor = 0.1;
-        scope.controls.maxPolarAngle = Math.PI * 1.0; //Math.PI * 0.35;//Math.PI * 1.0; //
-        scope.controls.maxDistance = Configuration.getNumericValue(viewBounds);// 7500; //2500
-        scope.controls.minDistance = 100; //1000; //1000
+        // Smooth controls with damping
+        scope.controls.enableDamping = true;
+        scope.controls.dampingFactor = 0.08;
+        scope.controls.maxPolarAngle = Math.PI * 0.85; // Prevent going under the floor
+        scope.controls.maxDistance = Configuration.getNumericValue(viewBounds);
+        scope.controls.minDistance = 100;
         scope.controls.screenSpacePanning = true;
+        scope.controls.rotateSpeed = 0.8;
+        scope.controls.zoomSpeed = 1.2;
 
         scope.skybox = new Skybox(this, scope.renderer);
         scope.camera.position.set(0, 600, 1500);
         scope.controls.update();
 
-        scope.axes = new AxesHelper(500);        
+        scope.axes = new AxesHelper(500);
         // handle window resizing
         scope.updateWindowSize();
         if (scope.__options.resize) {
@@ -293,20 +299,63 @@ export class Viewer3D extends Scene {
     }
 
     getARenderer() {
-        let renderer = new WebGLRenderer({ antialias: true, alpha: true });
-        renderer.autoClear = true; //true
+        let renderer = new WebGLRenderer({
+            antialias: true,
+            alpha: false,
+            powerPreference: 'high-performance'
+        });
+        renderer.autoClear = true;
         renderer.shadowMap.enabled = true;
-        // renderer.shadowMapAutoUpdate = true;
-        renderer.physicallyCorrectLights = true;
         renderer.shadowMap.type = PCFSoftShadowMap;
-        // renderer.setClearColor(0xFFFFFF, 1);
-        renderer.setClearColor(0x000000, 0.0);
+        renderer.physicallyCorrectLights = true;
+
+        // Modern white background
+        renderer.setClearColor(0xf8f8f8, 1);
         renderer.outputEncoding = sRGBEncoding;
-        renderer.toneMapping = NoToneMapping;
-        // renderer.toneMappingExposure = 0.5;
-        // renderer.toneMappingExposure = Math.pow(0.7, 5.0);
-        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Tone mapping for better lighting
+        renderer.toneMapping = ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         return renderer;
+    }
+
+    __setupLightingAndFog() {
+        // Clean white/gray fog for milky effect
+        const fogColor = new Color(0xf5f5f5);
+        this.fog = new Fog(fogColor, 1000, 15000);
+        this.background = new Color(0xf8f8f8);
+
+        // Hemisphere light for soft ambient illumination
+        const hemiLight = new HemisphereLight(0xffffff, 0xe0e0e0, 0.8);
+        hemiLight.position.set(0, 5000, 0);
+        this.add(hemiLight);
+
+        // Main directional light (sun)
+        const mainLight = new DirectionalLight(0xffffff, 1.0);
+        mainLight.position.set(2000, 4000, 2000);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 100;
+        mainLight.shadow.camera.far = 10000;
+        mainLight.shadow.camera.left = -3000;
+        mainLight.shadow.camera.right = 3000;
+        mainLight.shadow.camera.top = 3000;
+        mainLight.shadow.camera.bottom = -3000;
+        mainLight.shadow.bias = -0.0001;
+        mainLight.shadow.normalBias = 0.02;
+        this.add(mainLight);
+
+        // Fill light from opposite side
+        const fillLight = new DirectionalLight(0xffffff, 0.4);
+        fillLight.position.set(-2000, 2000, -1000);
+        this.add(fillLight);
+
+        // Soft ambient for shadow areas
+        const ambientLight = new AmbientLight(0xffffff, 0.3);
+        this.add(ambientLight);
     }
 
     updateWindowSize() {
@@ -326,13 +375,19 @@ export class Viewer3D extends Scene {
             return;
         }
         let scope = this;
-        // scope.controls.update();
-        if (!scope.needsUpdate) {
+
+        // Update controls for damping
+        if (scope.controls.enableDamping) {
+            scope.controls.update();
+        }
+
+        if (!scope.needsUpdate && !scope.controls.enableDamping) {
             return;
         }
+
         scope.renderer.render(scope, scope.camera);
         scope.lastRender = Date.now();
-        this.needsUpdate = false      
+        this.needsUpdate = false;
     }
 
     pauseTheRendering(flag) {
