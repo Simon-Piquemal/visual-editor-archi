@@ -2,6 +2,7 @@ import { WALL_OFFSET_THICKNESS, WALL_STANDARD_HEIGHT } from "../core/constants";
 import { Dimensioning } from "../core/dimensioning";
 import { EVENT_CORNER_2D_CLICKED, EVENT_NOTHING_2D_SELECTED, EVENT_WALL_2D_CLICKED, EVENT_ROOM_2D_CLICKED } from "../core/events";
 import { InWallFloorItem } from "../items/in_wall_floor_item";
+import { InWallItem } from "../items/in_wall_item";
 import { Vector2, Vector3 } from "three";
 
 export class FloorPlannerHelper {
@@ -544,7 +545,8 @@ export class FloorPlannerHelper {
 
         console.log('[addWindowAtPosition] Creating window with metadata:', itemMetaData);
         console.log('[addWindowAtPosition] wallCenterPoint:', wallCenterPoint);
-        let item = new InWallFloorItem(this.__model, itemMetaData);
+        // Use InWallItem (not InWallFloorItem) for windows - they're not bound to floor level
+        let item = new InWallItem(this.__model, itemMetaData);
         this.__model.addItem(item);
         item.snapToWall(wallCenterPoint, wall, wallEdge);
         console.log('[addWindowAtPosition] Window positioned at:', item.position);
