@@ -38,6 +38,7 @@ let floorplanningHelper = null;
 let roomplanningHelper = null;
 let parametricContextInterface = null;
 let currentMode = 'draw'; // 'draw', 'move', 'transform'
+let currentDragElement = null; // 'door' or 'window'
 
 // ========================================
 // DOM Elements
@@ -83,6 +84,11 @@ const elements = {
     btnAddWindow2D: $('btn-add-window-2d'),
     addElementHint: $('add-element-hint'),
 
+    // Drag & Drop
+    dragPreview: $('drag-preview'),
+    dragPreviewText: $('drag-preview-text'),
+    viewer2D: $('bp3djs-viewer2d'),
+
     // 2D Options
     optSnap: $('opt-snap'),
     optDirectional: $('opt-directional'),
@@ -126,6 +132,21 @@ const elements = {
     statusUnit: $('status-unit'),
     unitSelect: $('unit-select'),
     fpsCounter: $('fps-counter'),
+
+    // Background Image
+    bgImageInput: $('bg-image-input'),
+    btnLoadBgImage: $('btn-load-bg-image'),
+    bgImageControls: $('bg-image-controls'),
+    bgImageOpacity: $('bg-image-opacity'),
+    bgImageRotation: $('bg-image-rotation'),
+    bgImageVisible: $('bg-image-visible'),
+    btnCalibrate: $('btn-calibrate'),
+    calibrateHint: $('calibrate-hint'),
+    calibrateInputGroup: $('calibrate-input-group'),
+    bgCalibrateLength: $('bg-calibrate-length'),
+    btnApplyCalibration: $('btn-apply-calibration'),
+    btnCancelCalibration: $('btn-cancel-calibration'),
+    btnRemoveBgImage: $('btn-remove-bg-image'),
 };
 
 // ========================================
@@ -259,16 +280,16 @@ function hideAll3DProps() {
 }
 
 function updateAddElementHint() {
+    // Always enable buttons since we support drag & drop now
+    elements.btnAddDoor2D.disabled = false;
+    elements.btnAddWindow2D.disabled = false;
+
     if (floorplanningHelper && floorplanningHelper.selectedWall) {
-        elements.addElementHint.textContent = 'Cliquez pour ajouter au mur sélectionné';
+        elements.addElementHint.textContent = 'Cliquez ou glissez pour ajouter';
         elements.addElementHint.style.color = 'var(--text-muted)';
-        elements.btnAddDoor2D.disabled = false;
-        elements.btnAddWindow2D.disabled = false;
     } else {
-        elements.addElementHint.textContent = 'Sélectionnez un mur pour ajouter un élément';
+        elements.addElementHint.textContent = 'Glissez un élément sur le plan 2D';
         elements.addElementHint.style.color = 'var(--text-muted)';
-        elements.btnAddDoor2D.disabled = true;
-        elements.btnAddWindow2D.disabled = true;
     }
 }
 
@@ -377,6 +398,164 @@ function updateUnit(value) {
 }
 
 // ========================================
+// Background Image Functions
+// ========================================
+let isCalibrating = false;
+
+function loadBackgroundImage(file) {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        try {
+            await blueprint3d.floorplanner.setBackgroundImage(event.target.result, {
+                opacity: 0.5
+            });
+
+            // Afficher les contrôles
+            elements.bgImageControls.classList.remove('hidden');
+            elements.bgImageOpacity.value = 50;
+            elements.bgImageRotation.value = 0;
+            elements.bgImageVisible.checked = true;
+            updateRangeValue(elements.bgImageOpacity);
+            updateRangeValue(elements.bgImageRotation);
+            elements.calibrateHint.textContent = '';
+
+            // Sauvegarder dans le modèle
+            saveBackgroundImageToModel();
+
+            console.log('Image de fond chargée');
+        } catch (err) {
+            console.error('Erreur lors du chargement de l\'image:', err);
+            alert('Erreur lors du chargement de l\'image');
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function updateBgOpacity() {
+    const bgImage = blueprint3d.floorplanner.getBackgroundImage();
+    if (bgImage) {
+        bgImage.setOpacity(elements.bgImageOpacity.value / 100);
+        saveBackgroundImageToModel();
+    }
+    const valueSpan = elements.bgImageOpacity.parentElement.querySelector('.range-value');
+    if (valueSpan) {
+        valueSpan.textContent = elements.bgImageOpacity.value + '%';
+    }
+}
+
+function updateBgRotation() {
+    const bgImage = blueprint3d.floorplanner.getBackgroundImage();
+    if (bgImage) {
+        bgImage.setRotation(parseFloat(elements.bgImageRotation.value));
+        saveBackgroundImageToModel();
+    }
+    const valueSpan = elements.bgImageRotation.parentElement.querySelector('.range-value');
+    if (valueSpan) {
+        valueSpan.textContent = elements.bgImageRotation.value + '°';
+    }
+}
+
+function toggleBgVisibility() {
+    const bgImage = blueprint3d.floorplanner.getBackgroundImage();
+    if (bgImage) {
+        bgImage.visible = elements.bgImageVisible.checked;
+    }
+}
+
+function startCalibration() {
+    isCalibrating = true;
+    elements.calibrateHint.textContent = 'Cliquez sur le premier point de la ligne';
+    elements.calibrateHint.style.color = 'var(--accent-primary)';
+    elements.calibrateInputGroup.classList.add('hidden');
+
+    blueprint3d.floorplanner.startCalibrationMode((p1, p2, lineLength) => {
+        // Les deux points ont été définis
+        elements.calibrateHint.textContent = 'Ligne tracée! Entrez la longueur réelle.';
+        elements.calibrateHint.style.color = 'var(--accent-secondary)';
+        elements.calibrateInputGroup.classList.remove('hidden');
+    });
+
+    // Mettre à jour le hint après le premier clic
+    const checkFirstPoint = setInterval(() => {
+        if (blueprint3d.floorplanner.__calibrationPoint1 && !blueprint3d.floorplanner.__calibrationPoint2) {
+            elements.calibrateHint.textContent = 'Cliquez sur le deuxième point';
+        }
+        if (!isCalibrating) {
+            clearInterval(checkFirstPoint);
+        }
+    }, 100);
+}
+
+function applyCalibration() {
+    const lengthM = parseFloat(elements.bgCalibrateLength.value);
+    if (isNaN(lengthM) || lengthM <= 0) {
+        alert('Veuillez entrer une longueur valide');
+        return;
+    }
+
+    // Convertir mètres en cm
+    const lengthCm = lengthM * 100;
+
+    blueprint3d.floorplanner.applyCalibration(lengthCm);
+    blueprint3d.floorplanner.endCalibrationMode();
+
+    isCalibrating = false;
+    elements.calibrateHint.textContent = 'Calibration appliquée!';
+    elements.calibrateHint.style.color = 'var(--accent-secondary)';
+    elements.calibrateInputGroup.classList.add('hidden');
+
+    // Sauvegarder dans le modèle
+    saveBackgroundImageToModel();
+
+    setTimeout(() => {
+        elements.calibrateHint.textContent = '';
+    }, 3000);
+}
+
+function cancelCalibration() {
+    isCalibrating = false;
+    blueprint3d.floorplanner.endCalibrationMode();
+    elements.calibrateHint.textContent = '';
+    elements.calibrateInputGroup.classList.add('hidden');
+}
+
+function removeBackgroundImage() {
+    blueprint3d.floorplanner.removeBackgroundImage();
+    blueprint3d.model.setBackgroundImageData(null);
+    elements.bgImageControls.classList.add('hidden');
+    elements.calibrateInputGroup.classList.add('hidden');
+    elements.calibrateHint.textContent = '';
+    isCalibrating = false;
+}
+
+function saveBackgroundImageToModel() {
+    const bgData = blueprint3d.floorplanner.getBackgroundImageData();
+    blueprint3d.model.setBackgroundImageData(bgData);
+}
+
+async function loadBackgroundImageFromModel() {
+    const bgData = blueprint3d.model.getBackgroundImageData();
+    if (bgData && bgData.dataURL) {
+        try {
+            await blueprint3d.floorplanner.loadBackgroundImageData(bgData);
+
+            // Mettre à jour l'UI
+            elements.bgImageControls.classList.remove('hidden');
+            elements.bgImageOpacity.value = (bgData.opacity || 0.5) * 100;
+            elements.bgImageRotation.value = bgData.rotation || 0;
+            elements.bgImageVisible.checked = true;
+            updateRangeValue(elements.bgImageOpacity);
+            updateRangeValue(elements.bgImageRotation);
+            elements.calibrateHint.textContent = bgData.calibrated ? 'Image calibrée' : '';
+
+            console.log('Image de fond restaurée depuis le projet');
+        } catch (err) {
+            console.error('Erreur lors du chargement de l\'image de fond:', err);
+        }
+    }
+}
+
+// ========================================
 // Event Binding
 // ========================================
 function bindEvents() {
@@ -442,6 +621,21 @@ function bindEvents() {
     // Unit select
     elements.unitSelect.addEventListener('change', (e) => updateUnit(e.target.value));
 
+    // Background Image
+    elements.btnLoadBgImage.addEventListener('click', () => elements.bgImageInput.click());
+    elements.bgImageInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+            loadBackgroundImage(e.target.files[0]);
+        }
+    });
+    elements.bgImageOpacity.addEventListener('input', updateBgOpacity);
+    elements.bgImageRotation.addEventListener('input', updateBgRotation);
+    elements.bgImageVisible.addEventListener('change', toggleBgVisibility);
+    elements.btnCalibrate.addEventListener('click', startCalibration);
+    elements.btnApplyCalibration.addEventListener('click', applyCalibration);
+    elements.btnCancelCalibration.addEventListener('click', cancelCalibration);
+    elements.btnRemoveBgImage.addEventListener('click', removeBackgroundImage);
+
     // 2D Add elements (door/window)
     elements.btnAddDoor2D.addEventListener('click', () => {
         if (floorplanningHelper.addDoorToSelectedWall(1)) {
@@ -471,11 +665,231 @@ function bindEvents() {
 }
 
 // ========================================
+// Drag & Drop Functions (Custom implementation)
+// ========================================
+let isDragging = false;
+let dragSourceElement = null;
+
+function setupDragAndDrop() {
+    // Use mousedown instead of dragstart for better control
+    elements.btnAddDoor2D.addEventListener('mousedown', (e) => startCustomDrag(e, 'door'));
+    elements.btnAddWindow2D.addEventListener('mousedown', (e) => startCustomDrag(e, 'window'));
+
+    // Global mouse events for drag
+    document.addEventListener('mousemove', handleCustomDragMove);
+    document.addEventListener('mouseup', handleCustomDragEnd);
+}
+
+function startCustomDrag(e, elementType) {
+    e.preventDefault();
+    isDragging = true;
+    currentDragElement = elementType;
+    dragSourceElement = e.currentTarget;
+    dragSourceElement.classList.add('dragging');
+
+    // Update preview text and icon
+    elements.dragPreviewText.textContent = elementType === 'door' ? 'Porte' : 'Fenêtre';
+
+    const previewIcon = elements.dragPreview.querySelector('.preview-icon');
+    if (elementType === 'door') {
+        previewIcon.innerHTML = '<rect x="4" y="2" width="16" height="20" rx="1"/><path d="M14 2v20"/><circle cx="12" cy="12" r="1"/>';
+    } else {
+        previewIcon.innerHTML = '<rect x="3" y="4" width="18" height="16" rx="1"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="3" y1="12" x2="21" y2="12"/>';
+    }
+
+    // Position and show preview
+    elements.dragPreview.style.left = e.clientX + 'px';
+    elements.dragPreview.style.top = e.clientY + 'px';
+    elements.dragPreview.classList.add('visible');
+
+    // Update hint
+    elements.addElementHint.textContent = 'Déposez sur un mur du plan 2D';
+    elements.addElementHint.style.color = 'var(--accent-primary)';
+}
+
+function handleCustomDragMove(e) {
+    if (!isDragging || !currentDragElement) return;
+
+    // Move preview
+    elements.dragPreview.style.left = e.clientX + 'px';
+    elements.dragPreview.style.top = e.clientY + 'px';
+
+    // Check if over 2D viewer
+    const rect = elements.viewer2D.getBoundingClientRect();
+    const isOverViewer = e.clientX >= rect.left && e.clientX <= rect.right &&
+                         e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+    if (isOverViewer) {
+        elements.viewer2D.classList.add('drop-target');
+
+        // Convert to cm and check wall proximity
+        const pixelX = e.clientX - rect.left;
+        const pixelY = e.clientY - rect.top;
+        const cmPos = pixelToFloorplanCm(pixelX, pixelY);
+
+        if (cmPos) {
+            const closest = floorplanningHelper.findClosestWall(cmPos.x, cmPos.y);
+            if (closest && closest.distance < 150) {
+                elements.viewer2D.classList.add('drop-target-valid');
+                elements.viewer2D.classList.remove('drop-target-invalid');
+                elements.addElementHint.textContent = 'Relâchez pour placer';
+                elements.addElementHint.style.color = 'var(--accent-secondary)';
+            } else {
+                elements.viewer2D.classList.add('drop-target-invalid');
+                elements.viewer2D.classList.remove('drop-target-valid');
+                elements.addElementHint.textContent = 'Trop loin d\'un mur';
+                elements.addElementHint.style.color = 'var(--accent-danger)';
+            }
+        }
+    } else {
+        elements.viewer2D.classList.remove('drop-target', 'drop-target-valid', 'drop-target-invalid');
+        elements.addElementHint.textContent = 'Déposez sur un mur du plan 2D';
+        elements.addElementHint.style.color = 'var(--accent-primary)';
+    }
+}
+
+function handleCustomDragEnd(e) {
+    if (!isDragging || !currentDragElement) return;
+
+    // Store element type before reset
+    const elementType = currentDragElement;
+
+    // Hide preview and reset styles
+    elements.dragPreview.classList.remove('visible');
+    elements.viewer2D.classList.remove('drop-target', 'drop-target-valid', 'drop-target-invalid');
+    if (dragSourceElement) {
+        dragSourceElement.classList.remove('dragging');
+    }
+
+    // Check if dropped on 2D viewer
+    const rect = elements.viewer2D.getBoundingClientRect();
+    const isOverViewer = e.clientX >= rect.left && e.clientX <= rect.right &&
+                         e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+    console.log('Drop - isOverViewer:', isOverViewer, 'elementType:', elementType);
+    console.log('Viewer rect:', rect);
+    console.log('Mouse position:', e.clientX, e.clientY);
+
+    if (isOverViewer) {
+        const pixelX = e.clientX - rect.left;
+        const pixelY = e.clientY - rect.top;
+        const cmPos = pixelToFloorplanCm(pixelX, pixelY);
+
+        console.log('Drop position - pixel:', pixelX, pixelY, 'cm:', cmPos);
+
+        if (cmPos) {
+            let success = false;
+            let successMessage = '';
+
+            if (elementType === 'entry-door') {
+                console.log('Adding entry door at', cmPos.x, cmPos.y);
+                if (floorplanningHelper.hasEntryDoor()) {
+                    console.log('Entry door already exists, replacing...');
+                }
+                success = floorplanningHelper.addEntryDoorAtPosition(cmPos.x, cmPos.y);
+                successMessage = 'Porte d\'entrée ajoutée!';
+            } else if (elementType === 'door') {
+                console.log('Adding internal door at', cmPos.x, cmPos.y);
+                success = floorplanningHelper.addDoorAtPosition(cmPos.x, cmPos.y, 1);
+                successMessage = 'Porte interne ajoutée!';
+            } else if (elementType === 'window') {
+                console.log('Adding window at', cmPos.x, cmPos.y);
+                success = floorplanningHelper.addWindowAtPosition(cmPos.x, cmPos.y);
+                successMessage = 'Fenêtre ajoutée!';
+            }
+
+            console.log('Add result:', success);
+
+            if (success) {
+                elements.addElementHint.textContent = successMessage;
+                elements.addElementHint.style.color = 'var(--accent-secondary)';
+            } else {
+                elements.addElementHint.textContent = 'Trop loin d\'un mur';
+                elements.addElementHint.style.color = 'var(--accent-danger)';
+            }
+        } else {
+            console.log('cmPos is null');
+            elements.addElementHint.textContent = 'Erreur de position';
+            elements.addElementHint.style.color = 'var(--accent-danger)';
+        }
+    }
+
+    // Reset state
+    isDragging = false;
+    currentDragElement = null;
+    dragSourceElement = null;
+
+    // Reset hint after delay
+    setTimeout(() => {
+        if (!isDragging) {
+            elements.addElementHint.textContent = 'Glissez un élément sur le plan 2D';
+            elements.addElementHint.style.color = 'var(--text-muted)';
+        }
+    }, 2000);
+}
+
+// Debug function - test adding door to first wall
+window.testAddDoor = function() {
+    const walls = floorplanningHelper.floorplan.walls;
+    console.log('Number of walls:', walls.length);
+    if (walls.length > 0) {
+        const wall = walls[0];
+        const center = wall.wallCenter();
+        console.log('Wall center:', center);
+        const success = floorplanningHelper.addDoorAtPosition(center.x, center.y, 1);
+        console.log('Door added:', success);
+    }
+};
+
+window.testAddWindow = function() {
+    const walls = floorplanningHelper.floorplan.walls;
+    console.log('Number of walls:', walls.length);
+    if (walls.length > 0) {
+        const wall = walls[0];
+        const center = wall.wallCenter();
+        console.log('Wall center:', center);
+        const success = floorplanningHelper.addWindowAtPosition(center.x, center.y);
+        console.log('Window added:', success);
+    }
+};
+
+function pixelToFloorplanCm(pixelX, pixelY) {
+    // Get the floorplanner viewport info
+    if (!blueprint3d || !blueprint3d.floorplanner) {
+        console.warn('blueprint3d or floorplanner not found');
+        return null;
+    }
+
+    const floorplanner = blueprint3d.floorplanner;
+
+    // Use the public getters we added to Viewer2D
+    const viewportPos = floorplanner.viewportPosition;
+    const scale = floorplanner.viewportScale;
+
+    if (!viewportPos || !scale) {
+        console.warn('Could not get viewport info');
+        return null;
+    }
+
+    // Convert pixel position to world coordinates
+    const worldX = (pixelX - viewportPos.x) / scale;
+    const worldY = (pixelY - viewportPos.y) / scale;
+
+    // Convert from pixels to cm
+    const cmX = Dimensioning.pixelToCm(worldX);
+    const cmY = Dimensioning.pixelToCm(worldY);
+
+    return { x: cmX, y: cmY };
+}
+
+// ========================================
 // Blueprint3D Event Listeners
 // ========================================
 function bindBlueprintEvents() {
-    blueprint3d.model.addEventListener(EVENT_LOADED, () => {
+    blueprint3d.model.addEventListener(EVENT_LOADED, async () => {
         console.log('Design loaded');
+        // Charger l'image de fond si présente dans le projet
+        await loadBackgroundImageFromModel();
     });
 
     // 2D Events
@@ -622,6 +1036,7 @@ function init() {
     // Bind events
     bindEvents();
     bindBlueprintEvents();
+    setupDragAndDrop();
 
     // Load default design
     const defaultRoom = JSON.stringify(default_room_json);

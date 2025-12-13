@@ -5,7 +5,7 @@ import { Matrix4, Triangle, Plane, Vector3 } from 'three';
  */
 export class RoofItem extends Item {
     constructor(model, metadata, id) {
-        super(model, metadata, id);
+        super(metadata, model, id); // Item expects (metadata, model, id)
         this.__customIntersectionPlanes = this.__model.floorplan.roofPlanesForIntersection;
         this.__boundToRoof = true;
     }

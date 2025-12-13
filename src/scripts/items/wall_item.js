@@ -8,7 +8,7 @@ import { Item, UP_VECTOR } from './item.js';
  */
 export class WallItem extends Item {
     constructor(model, metadata, id) {
-        super(model, metadata, id);
+        super(metadata, model, id); // Item expects (metadata, model, id)
         this.__isWallDependent = true;
         this.__boundToFloor = false;
         this.__allowRotate = false;

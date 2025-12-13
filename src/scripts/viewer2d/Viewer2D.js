@@ -13,8 +13,9 @@ import { IS_TOUCH_DEVICE } from '../../DeviceInfo';
 import { CornerGroupTransform2D } from './CornerGroupTransform2D';
 import Room from '../model/room';
 import { BoundaryView2D } from './BoundaryView2D';
+import { BackgroundImage2D } from './BackgroundImage2D';
 
-export const floorplannerModes = { MOVE: 0, DRAW: 1, EDIT_ISLANDS: 2 };
+export const floorplannerModes = { MOVE: 0, DRAW: 1, EDIT_ISLANDS: 2, CALIBRATE: 3 };
 
 class TemporaryWall extends Graphics {
     constructor() {
@@ -211,6 +212,16 @@ export class Viewer2D extends Application {
         this.__groupTransformer.visible = false;
         this.__groupTransformer.selected = null;
 
+        // Image de fond
+        this.__backgroundImage = null;
+        this.__backgroundImageHolder = new Graphics();
+
+        // Calibration
+        this.__calibrationLine = new Graphics();
+        this.__calibrationPoint1 = null;
+        this.__calibrationPoint2 = null;
+        this.__calibrationCallback = null;
+
         origin.beginFill(0xFF0000);
         origin.drawCircle(0, 0, 5);
 
@@ -221,12 +232,15 @@ export class Viewer2D extends Application {
 
         this.__tempWall.visible = false;
 
+        // Ajouter l'image de fond EN PREMIER (en dessous de tout)
+        this.__floorplanContainer.addChild(this.__backgroundImageHolder);
         this.__floorplanContainer.addChild(this.__grid2d);
         this.__floorplanContainer.addChild(this.__boundaryHolder);
         // this.__floorplanContainer.addChild(this.__tempWall);
         this.__floorplanContainer.addChild(origin);
         this.__floorplanContainer.addChild(this.__floorplanElementsHolder);
         this.__floorplanContainer.addChild(this.__groupTransformer);
+        this.__floorplanContainer.addChild(this.__calibrationLine);
 
         this.__tempWallHolder.addChild(this.__tempWall);
 
@@ -362,13 +376,27 @@ export class Viewer2D extends Application {
                 this.__floorplanContainer.plugins.resume('drag');
                 this.__changeCursorMode();
                 break;
+            case floorplannerModes.CALIBRATE:
+                this.__mode = floorplannerModes.CALIBRATE;
+                this.__floorplanContainer.plugins.pause('drag');
+                for (let i = 0; i < this.__entities2D.length; i++) {
+                    this.__entities2D[i].interactive = false;
+                }
+                this.__tempWall.visible = false;
+                this.__groupTransformer.visible = false;
+                this.__groupTransformer.selected = null;
+                this.__calibrationPoint1 = null;
+                this.__calibrationPoint2 = null;
+                this.__calibrationLine.clear();
+                this.__changeCursorMode();
+                break;
             default:
                 throw new Error('Unknown Viewer2D mode');
         }
     }
 
     __changeCursorMode() {
-        let cursor = (this.__mode === floorplannerModes.DRAW) ? 'crosshair' : 'pointer';
+        let cursor = (this.__mode === floorplannerModes.DRAW || this.__mode === floorplannerModes.CALIBRATE) ? 'crosshair' : 'pointer';
         this.renderer.plugins.interaction.cursorStyles.crosshair = cursor;
         this.renderer.plugins.interaction.cursorStyles.default = cursor;
         this.renderer.plugins.interaction.setCursorMode(cursor);
@@ -381,6 +409,12 @@ export class Viewer2D extends Application {
     }
 
     __drawModeMouseUp(evt) {
+        // Gérer le mode calibration
+        if (this.__mode === floorplannerModes.CALIBRATE) {
+            this.__handleCalibrationClick(evt);
+            return;
+        }
+
         if (this.__mode === floorplannerModes.DRAW) {
             let co = evt.data.getLocalPosition(this.__floorplanContainer);
             let cmCo = new Vector2(co.x, co.y);
@@ -459,6 +493,12 @@ export class Viewer2D extends Application {
     }
 
     __selectionMonitor(evt) {
+        // Gérer le mode calibration
+        if (this.__mode === floorplannerModes.CALIBRATE) {
+            this.__handleCalibrationClick(evt);
+            return;
+        }
+
         this.__currentSelection = null;
         this.__groupTransformer.visible = false;
         this.__groupTransformer.selected = null;
@@ -677,6 +717,18 @@ export class Viewer2D extends Application {
         this.__eventDispatcher.removeEventListener(type, listener);
     }
 
+    get viewportContainer() {
+        return this.__floorplanContainer;
+    }
+
+    get viewportScale() {
+        return this.__floorplanContainer.scale.x;
+    }
+
+    get viewportPosition() {
+        return { x: this.__floorplanContainer.x, y: this.__floorplanContainer.y };
+    }
+
     dispose() {
         this.__floorplanContainer.off('zoomed', this.__zoomedEvent);
         this.__floorplanContainer.off('moved', this.__pannedEvent);
@@ -688,5 +740,219 @@ export class Viewer2D extends Application {
         this.__floorplan.removeEventListener(EVENT_LOADED, this.__redrawFloorplanEvent);
         window.removeEventListener('resize', this.__windowResizeEvent);
         window.removeEventListener('orientationchange', this.__windowResizeEvent);
+
+        // Nettoyer l'image de fond
+        if (this.__backgroundImage) {
+            this.__backgroundImage.dispose();
+        }
+    }
+
+    // ========================================
+    // Méthodes pour l'image de fond
+    // ========================================
+
+    /**
+     * Charge une image de fond depuis une URL data
+     * @param {string} dataURL - L'URL data de l'image (base64)
+     * @param {object} options - Options optionnelles {opacity, rotation, position}
+     * @returns {Promise<BackgroundImage2D>}
+     */
+    async setBackgroundImage(dataURL, options = {}) {
+        // Supprimer l'image précédente si elle existe
+        if (this.__backgroundImage) {
+            this.__backgroundImageHolder.removeChild(this.__backgroundImage);
+            this.__backgroundImage.dispose();
+        }
+
+        // Créer une nouvelle image de fond
+        this.__backgroundImage = new BackgroundImage2D();
+        await this.__backgroundImage.loadFromDataURL(dataURL);
+
+        // Appliquer les options
+        if (typeof options.opacity === 'number') {
+            this.__backgroundImage.setOpacity(options.opacity);
+        }
+        if (typeof options.rotation === 'number') {
+            this.__backgroundImage.setRotation(options.rotation);
+        }
+        if (options.position) {
+            this.__backgroundImage.setPositionCm(options.position.x || 0, options.position.y || 0);
+        }
+
+        // Ajouter au container
+        this.__backgroundImageHolder.addChild(this.__backgroundImage);
+
+        return this.__backgroundImage;
+    }
+
+    /**
+     * Récupère l'image de fond actuelle
+     * @returns {BackgroundImage2D|null}
+     */
+    getBackgroundImage() {
+        return this.__backgroundImage;
+    }
+
+    /**
+     * Supprime l'image de fond
+     */
+    removeBackgroundImage() {
+        if (this.__backgroundImage) {
+            this.__backgroundImageHolder.removeChild(this.__backgroundImage);
+            this.__backgroundImage.dispose();
+            this.__backgroundImage = null;
+        }
+        this.__calibrationLine.clear();
+        this.__calibrationPoint1 = null;
+        this.__calibrationPoint2 = null;
+    }
+
+    /**
+     * Démarre le mode calibration
+     * @param {function} callback - Fonction appelée quand les deux points sont définis
+     *                              callback(p1, p2, lineLength) où lineLength est en pixels viewport
+     */
+    startCalibrationMode(callback) {
+        if (!this.__backgroundImage) {
+            console.warn('Pas d\'image de fond pour calibrer');
+            return;
+        }
+        this.__calibrationCallback = callback;
+        this.switchMode(floorplannerModes.CALIBRATE);
+    }
+
+    /**
+     * Termine le mode calibration et retourne au mode déplacement
+     */
+    endCalibrationMode() {
+        this.__calibrationLine.clear();
+        this.__calibrationPoint1 = null;
+        this.__calibrationPoint2 = null;
+        this.__calibrationCallback = null;
+        this.switchMode(floorplannerModes.MOVE);
+    }
+
+    /**
+     * Gère le clic en mode calibration
+     * @param {object} evt - Événement PixiJS
+     */
+    __handleCalibrationClick(evt) {
+        if (this.__mode !== floorplannerModes.CALIBRATE) return;
+
+        const co = evt.data.getLocalPosition(this.__floorplanContainer);
+        const point = { x: co.x, y: co.y };
+
+        if (!this.__calibrationPoint1) {
+            // Premier point
+            this.__calibrationPoint1 = point;
+            this.__drawCalibrationVisual();
+        } else if (!this.__calibrationPoint2) {
+            // Deuxième point
+            this.__calibrationPoint2 = point;
+            this.__drawCalibrationVisual();
+
+            // Calculer la longueur de la ligne en pixels viewport
+            const dx = this.__calibrationPoint2.x - this.__calibrationPoint1.x;
+            const dy = this.__calibrationPoint2.y - this.__calibrationPoint1.y;
+            const lineLength = Math.sqrt(dx * dx + dy * dy);
+
+            // Appeler le callback si défini
+            if (this.__calibrationCallback) {
+                this.__calibrationCallback(
+                    this.__calibrationPoint1,
+                    this.__calibrationPoint2,
+                    lineLength
+                );
+            }
+        }
+    }
+
+    /**
+     * Dessine la visualisation de la ligne de calibration
+     */
+    __drawCalibrationVisual() {
+        this.__calibrationLine.clear();
+
+        const accentColor = 0xFF6B6B;
+        const whiteColor = 0xFFFFFF;
+
+        if (this.__calibrationPoint1) {
+            // Point 1
+            this.__calibrationLine.lineStyle(2, accentColor, 1);
+            this.__calibrationLine.beginFill(accentColor, 0.8);
+            this.__calibrationLine.drawCircle(this.__calibrationPoint1.x, this.__calibrationPoint1.y, 10);
+            this.__calibrationLine.endFill();
+            this.__calibrationLine.beginFill(whiteColor, 1);
+            this.__calibrationLine.drawCircle(this.__calibrationPoint1.x, this.__calibrationPoint1.y, 5);
+            this.__calibrationLine.endFill();
+        }
+
+        if (this.__calibrationPoint1 && this.__calibrationPoint2) {
+            // Ligne entre les deux points
+            this.__calibrationLine.lineStyle(4, accentColor, 0.8);
+            this.__calibrationLine.moveTo(this.__calibrationPoint1.x, this.__calibrationPoint1.y);
+            this.__calibrationLine.lineTo(this.__calibrationPoint2.x, this.__calibrationPoint2.y);
+
+            // Point 2
+            this.__calibrationLine.lineStyle(2, accentColor, 1);
+            this.__calibrationLine.beginFill(accentColor, 0.8);
+            this.__calibrationLine.drawCircle(this.__calibrationPoint2.x, this.__calibrationPoint2.y, 10);
+            this.__calibrationLine.endFill();
+            this.__calibrationLine.beginFill(whiteColor, 1);
+            this.__calibrationLine.drawCircle(this.__calibrationPoint2.x, this.__calibrationPoint2.y, 5);
+            this.__calibrationLine.endFill();
+        }
+    }
+
+    /**
+     * Applique la calibration avec une longueur réelle en cm
+     * @param {number} realLengthCm - Longueur réelle de la ligne en cm
+     */
+    applyCalibration(realLengthCm) {
+        if (!this.__backgroundImage || !this.__calibrationPoint1 || !this.__calibrationPoint2) {
+            console.warn('Calibration impossible: points non définis');
+            return;
+        }
+
+        // Calculer la longueur de la ligne en pixels viewport
+        const dx = this.__calibrationPoint2.x - this.__calibrationPoint1.x;
+        const dy = this.__calibrationPoint2.y - this.__calibrationPoint1.y;
+        const linePixelLength = Math.sqrt(dx * dx + dy * dy);
+
+        // La longueur cible en pixels pour correspondre à la dimension réelle
+        const targetPixelLength = Dimensioning.cmToPixel(realLengthCm);
+
+        // Calculer le nouveau scale de l'image
+        const currentScale = this.__backgroundImage.getCalibrationScale();
+        const newScale = currentScale * (targetPixelLength / linePixelLength);
+
+        this.__backgroundImage.setCalibrationScale(newScale);
+
+        // Nettoyer la ligne de calibration
+        this.__calibrationLine.clear();
+
+        console.log(`Calibration appliquée: échelle = ${newScale.toFixed(4)}`);
+    }
+
+    /**
+     * Récupère les données de l'image de fond pour la sauvegarde
+     * @returns {object|null}
+     */
+    getBackgroundImageData() {
+        if (!this.__backgroundImage) return null;
+        return this.__backgroundImage.toJSON();
+    }
+
+    /**
+     * Charge une image de fond depuis des données sauvegardées
+     * @param {object} data - Données sérialisées
+     * @returns {Promise}
+     */
+    async loadBackgroundImageData(data) {
+        if (!data || !data.dataURL) return;
+
+        this.__backgroundImage = new BackgroundImage2D();
+        await this.__backgroundImage.fromJSON(data);
+        this.__backgroundImageHolder.addChild(this.__backgroundImage);
     }
 }

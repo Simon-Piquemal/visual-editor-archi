@@ -24,6 +24,7 @@ export class Model extends EventDispatcher {
         this.__lightItems = [];
         this.__environment=null;
         this.__floorItems = [];
+        this.__backgroundImageData = null;
         // this.__wallSelectedEvent = this.__wallSelected.bind(this);
         // this.addEventListener(EVENT_WALL_CLICKED, this.__wallSelectedEvent);
     }
@@ -42,6 +43,12 @@ export class Model extends EventDispatcher {
         this.dispatchEvent({ type: EVENT_LOADING, item: this });
         var data = JSON.parse(json);
         this.newDesign(data.floorplanner || data.floorplan, data.items, data.lights,data.environment);
+
+        // Charger les données de l'image de fond si présentes
+        if (data.backgroundImage) {
+            this.__backgroundImageData = data.backgroundImage;
+        }
+
         this.dispatchEvent({ type: EVENT_LOADED, item: this});
     }
 
@@ -53,7 +60,29 @@ export class Model extends EventDispatcher {
             roomItemsJSON.push(item.metadata);
         });
         var room = { floorplanner: floorplanJSON, items: roomItemsJSON };
+
+        // Ajouter les données de l'image de fond si présentes
+        if (this.__backgroundImageData) {
+            room.backgroundImage = this.__backgroundImageData;
+        }
+
         return JSON.stringify(room);
+    }
+
+    /**
+     * Définit les données de l'image de fond
+     * @param {object|null} data - Données de l'image de fond
+     */
+    setBackgroundImageData(data) {
+        this.__backgroundImageData = data;
+    }
+
+    /**
+     * Récupère les données de l'image de fond
+     * @returns {object|null}
+     */
+    getBackgroundImageData() {
+        return this.__backgroundImageData;
     }
 
     newDesign(floorplan, items, lights, environment) {

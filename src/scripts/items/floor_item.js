@@ -7,7 +7,7 @@ import { Utils } from '../core/utils.js';
  */
 export class FloorItem extends Item {
     constructor(model, metadata, id) {
-        super(model, metadata, id);
+        super(metadata, model, id); // Item expects (metadata, model, id)
         this.__freePosition = false;
         this.__boundToFloor = true;
         this.__customIntersectionPlanes = this.__model.floorplan.floorPlanesForIntersection;

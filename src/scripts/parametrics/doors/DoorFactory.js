@@ -4,8 +4,17 @@ import { ParametricDoorType3 } from "./ParametricDoorType3";
 import { ParametricDoorType4 } from "./ParametricDoorType4";
 import { ParametricDoorType5 } from "./ParametricDoorType5";
 import { ParametricDoorType6 } from "./ParametricDoorType6";
+import { ProceduralDoor } from "./ProceduralDoor";
 
-export const DOOR_TYPES = { 1: ParametricBaseDoor, 2: ParametricDoorType2, 3: ParametricDoorType3, 4: ParametricDoorType4, 5: ParametricDoorType5, 6: ParametricDoorType6 };
+export const DOOR_TYPES = {
+    1: ParametricBaseDoor,
+    2: ParametricDoorType2,
+    3: ParametricDoorType3,
+    4: ParametricDoorType4,
+    5: ParametricDoorType5,
+    6: ParametricDoorType6,
+    7: ProceduralDoor  // New procedural door with multiple styles
+};
 
 /** Factory class to create items. */
 export class DoorFactory {

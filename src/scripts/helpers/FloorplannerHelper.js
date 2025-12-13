@@ -2,7 +2,7 @@ import { WALL_OFFSET_THICKNESS, WALL_STANDARD_HEIGHT } from "../core/constants";
 import { Dimensioning } from "../core/dimensioning";
 import { EVENT_CORNER_2D_CLICKED, EVENT_NOTHING_2D_SELECTED, EVENT_WALL_2D_CLICKED, EVENT_ROOM_2D_CLICKED } from "../core/events";
 import { InWallFloorItem } from "../items/in_wall_floor_item";
-import { Vector3 } from "three";
+import { Vector2, Vector3 } from "three";
 
 export class FloorPlannerHelper {
     constructor(floorplan, floorplanner, model) {
@@ -13,6 +13,9 @@ export class FloorPlannerHelper {
         this.__wallThickness = Dimensioning.cmToMeasureRaw(WALL_OFFSET_THICKNESS);
         this.__cornerElevation = Dimensioning.cmToMeasureRaw(WALL_STANDARD_HEIGHT);
         this.__roomName = 'A New Room';
+
+        // Track entry door (only one allowed)
+        this.__entryDoor = null;
 
         /**
          * Store a reference to the model entities
@@ -125,6 +128,9 @@ export class FloorPlannerHelper {
             return false;
         }
 
+        // Force floorplan update to ensure edges exist
+        this.__floorplan.update();
+
         let wall = this.__selectedWall;
         let wallEdge = wall.frontEdge || wall.backEdge;
 
@@ -161,10 +167,9 @@ export class FloorPlannerHelper {
             size: [100, 210, 20],
             fixed: false,
             resizable: false,
-            wall: wall.id,
         };
 
-        let item = new InWallFloorItem(itemMetaData, this.__model);
+        let item = new InWallFloorItem(this.__model, itemMetaData);
         this.__model.addItem(item);
         item.snapToWall(wallCenterPoint, wall, wallEdge);
 
@@ -175,6 +180,9 @@ export class FloorPlannerHelper {
         if (!this.__selectedWall) {
             return false;
         }
+
+        // Force floorplan update to ensure edges exist
+        this.__floorplan.update();
 
         let wall = this.__selectedWall;
         let wallEdge = wall.frontEdge || wall.backEdge;
@@ -207,13 +215,344 @@ export class FloorPlannerHelper {
             size: [120, 100, 10],
             fixed: false,
             resizable: false,
-            wall: wall.id,
         };
 
-        let item = new InWallFloorItem(itemMetaData, this.__model);
+        let item = new InWallFloorItem(this.__model, itemMetaData);
         this.__model.addItem(item);
         item.snapToWall(wallCenterPoint, wall, wallEdge);
 
         return true;
+    }
+
+    /**
+     * Find the closest wall to a given position in cm
+     * @param {number} cmX - X position in cm
+     * @param {number} cmY - Y position in cm (which is Z in 3D space)
+     * @returns {Object|null} - Object with wall, edge, position and distance info
+     */
+    findClosestWall(cmX, cmY) {
+        // Ensure floorplan is updated and edges exist
+        console.log('[findClosestWall] Updating floorplan to ensure edges exist...');
+        this.__floorplan.update();
+
+        let walls = this.__floorplan.walls;
+        let closestWall = null;
+        let closestDistance = Infinity;
+        let closestProjection = 0;
+        let closestEdge = null;
+
+        console.log('[findClosestWall] Searching among', walls.length, 'walls for position:', cmX, cmY);
+
+        let point = new Vector2(cmX, cmY);
+
+        for (let wall of walls) {
+            console.log('[findClosestWall] Wall:', wall.id, 'frontEdge:', wall.frontEdge, 'backEdge:', wall.backEdge);
+            let wallStart = wall.start.location;
+            let wallEnd = wall.end.location;
+            let wallVec = wallEnd.clone().sub(wallStart);
+            let wallLength = wallVec.length();
+            let wallDir = wallVec.clone().normalize();
+
+            // Project point onto wall line
+            let pointVec = point.clone().sub(wallStart);
+            let projection = pointVec.dot(wallDir);
+
+            // Clamp projection to wall bounds with margin for item size
+            let margin = 60; // 60cm margin for door/window
+            let clampedProjection = Math.max(margin, Math.min(wallLength - margin, projection));
+
+            // Calculate closest point on wall
+            let closestPoint = wallStart.clone().add(wallDir.clone().multiplyScalar(clampedProjection));
+
+            // Calculate distance to wall
+            let distance = point.distanceTo(closestPoint);
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestWall = wall;
+                closestProjection = clampedProjection;
+
+                // Determine which edge to use based on which side of the wall the point is
+                let wallNormal = wallDir.clone().rotateAround(new Vector2(), Math.PI * 0.5);
+                let toPoint = point.clone().sub(closestPoint);
+                let side = toPoint.dot(wallNormal);
+
+                // Choose front or back edge based on side
+                closestEdge = side >= 0 ? wall.frontEdge : wall.backEdge;
+                if (!closestEdge) {
+                    closestEdge = wall.frontEdge || wall.backEdge;
+                }
+            }
+        }
+
+        if (!closestWall || !closestEdge) {
+            console.log('[findClosestWall] No wall or edge found! closestWall:', closestWall, 'closestEdge:', closestEdge);
+            return null;
+        }
+
+        console.log('[findClosestWall] Found closest wall:', closestWall.id, 'distance:', closestDistance);
+
+        // Calculate the exact position on the wall
+        let wallStart = closestWall.start.location;
+        let wallEnd = closestWall.end.location;
+        let wallDir = wallEnd.clone().sub(wallStart).normalize();
+        let posOnWall = wallStart.clone().add(wallDir.clone().multiplyScalar(closestProjection));
+
+        return {
+            wall: closestWall,
+            edge: closestEdge,
+            position: posOnWall,
+            distance: closestDistance
+        };
+    }
+
+    /**
+     * Add a door at a specific position (in cm)
+     * @param {number} cmX - X position in cm
+     * @param {number} cmY - Y position in cm
+     * @param {number} doorType - Door type (1-6)
+     * @returns {boolean} - Success
+     */
+    addDoorAtPosition(cmX, cmY, doorType = 1) {
+        console.log('[addDoorAtPosition] Starting with cmX:', cmX, 'cmY:', cmY, 'doorType:', doorType);
+
+        let closest = this.findClosestWall(cmX, cmY);
+
+        if (!closest || closest.distance > 300) { // 300cm snap threshold (was 150)
+            console.log('[addDoorAtPosition] No wall found or distance too far:', closest);
+            return false;
+        }
+
+        console.log('[addDoorAtPosition] Found closest wall:', closest);
+        console.log('[addDoorAtPosition] Wall:', closest.wall);
+        console.log('[addDoorAtPosition] Edge:', closest.edge);
+        console.log('[addDoorAtPosition] Edge normal:', closest.edge ? closest.edge.normal : 'NO EDGE');
+        console.log('[addDoorAtPosition] Edge center:', closest.edge ? closest.edge.center : 'NO EDGE');
+
+        let wall = closest.wall;
+        let wallEdge = closest.edge;
+        let pos = closest.position;
+
+        // Door height and center position (door centered at y=0, so center Y = height/2)
+        const doorHeight = 210;
+        let wallCenterPoint = new Vector3(pos.x, doorHeight / 2, pos.y);
+
+        console.log('[addDoorAtPosition] wallCenterPoint:', wallCenterPoint);
+
+        // Use new ProceduralDoor (type 7) with panels style for internal doors
+        let itemMetaData = {
+            itemName: "Porte Interne",
+            isParametric: true,
+            baseParametricType: "DOOR",
+            subParametricData: {
+                type: 7, // ProceduralDoor
+                width: 90,
+                height: doorHeight,
+                thickness: 4,
+                style: 'panels',
+                panelCount: 4,
+                panelDepth: 1,
+                handleType: 'lever',
+                handlePosition: 50,
+                handleSide: 'right',
+                doorColor: '#FFFFFF', // White internal door
+                handleColor: '#C0C0C0', // Silver handle
+                showFrame: true,
+                frameWidth: 8,
+                frameColor: '#F5F5DC', // Beige frame
+                openAngle: 0,
+                openDirection: 'outward'
+            },
+            itemType: 7,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            size: [90, 210, 4],
+            fixed: false,
+            resizable: false,
+            // Don't set wall here - snapToWall will handle the wall association
+        };
+
+        console.log('[addDoorAtPosition] Creating InWallFloorItem with metadata:', itemMetaData);
+        let item = new InWallFloorItem(this.__model, itemMetaData);
+        console.log('[addDoorAtPosition] Item created:', item);
+
+        this.__model.addItem(item);
+        console.log('[addDoorAtPosition] Item added to model');
+
+        console.log('[addDoorAtPosition] Calling snapToWall with:', wallCenterPoint, wall, wallEdge);
+        item.snapToWall(wallCenterPoint, wall, wallEdge);
+        console.log('[addDoorAtPosition] snapToWall completed, item position:', item.position);
+
+        return true;
+    }
+
+    /**
+     * Add an entry door at a specific position (in cm)
+     * Only one entry door is allowed - will replace existing one
+     * @param {number} cmX - X position in cm
+     * @param {number} cmY - Y position in cm
+     * @returns {boolean} - Success
+     */
+    addEntryDoorAtPosition(cmX, cmY) {
+        console.log('[addEntryDoorAtPosition] Starting with cmX:', cmX, 'cmY:', cmY);
+
+        // Remove existing entry door if any
+        if (this.__entryDoor) {
+            console.log('[addEntryDoorAtPosition] Removing existing entry door');
+            this.__model.removeItem(this.__entryDoor);
+            this.__entryDoor = null;
+        }
+
+        let closest = this.findClosestWall(cmX, cmY);
+
+        if (!closest || closest.distance > 300) {
+            console.log('[addEntryDoorAtPosition] No wall found or distance too far:', closest);
+            return false;
+        }
+
+        let wall = closest.wall;
+        let wallEdge = closest.edge;
+        let pos = closest.position;
+
+        // Door height and center position (door centered at y=0, so center Y = height/2)
+        const doorHeight = 215;
+        let wallCenterPoint = new Vector3(pos.x, doorHeight / 2, pos.y);
+
+        // Use new ProceduralDoor (type 7) with modern style for entry door
+        let itemMetaData = {
+            itemName: "Porte d'Entree",
+            isParametric: true,
+            baseParametricType: "DOOR",
+            subParametricData: {
+                type: 7, // ProceduralDoor
+                width: 100,
+                height: doorHeight,
+                thickness: 5,
+                style: 'modern', // Modern style for entry
+                panelCount: 4,
+                panelDepth: 1,
+                handleType: 'lever',
+                handlePosition: 50,
+                handleSide: 'right',
+                doorColor: '#5D4037', // Brown wood color
+                handleColor: '#C0A060', // Brass handle
+                showFrame: true,
+                frameWidth: 10,
+                frameColor: '#4A3728', // Darker wood frame
+                openAngle: 0,
+                openDirection: 'outward',
+                isEntryDoor: true // Mark as entry door
+            },
+            itemType: 7,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            size: [100, 215, 5],
+            fixed: false,
+            resizable: false,
+            isEntryDoor: true // Mark as entry door
+        };
+
+        let item = new InWallFloorItem(this.__model, itemMetaData);
+        this.__model.addItem(item);
+        item.snapToWall(wallCenterPoint, wall, wallEdge);
+
+        // Store reference to entry door
+        this.__entryDoor = item;
+
+        console.log('[addEntryDoorAtPosition] Entry door added successfully');
+        return true;
+    }
+
+    /**
+     * Check if an entry door already exists
+     * @returns {boolean}
+     */
+    hasEntryDoor() {
+        return this.__entryDoor !== null;
+    }
+
+    /**
+     * Get the entry door item
+     * @returns {InWallFloorItem|null}
+     */
+    getEntryDoor() {
+        return this.__entryDoor;
+    }
+
+    /**
+     * Add a window at a specific position (in cm)
+     * @param {number} cmX - X position in cm
+     * @param {number} cmY - Y position in cm
+     * @returns {boolean} - Success
+     */
+    addWindowAtPosition(cmX, cmY) {
+        let closest = this.findClosestWall(cmX, cmY);
+
+        if (!closest || closest.distance > 300) { // 300cm snap threshold
+            return false;
+        }
+
+        let wall = closest.wall;
+        let wallEdge = closest.edge;
+        let pos = closest.position;
+
+        // Window dimensions and position
+        // Window is centered at y=0, so we need: centerY = bottomFromFloor + height/2
+        // Standard window bottom is ~90cm from floor
+        const windowHeight = 120;
+        const windowBottomFromFloor = 100; // 1m from floor
+        const windowCenterY = windowBottomFromFloor + windowHeight / 2; // 100 + 60 = 160cm
+        console.log('[addWindowAtPosition] Window centerY:', windowCenterY);
+        let wallCenterPoint = new Vector3(pos.x, windowCenterY, pos.y);
+
+        // Use new ProceduralWindow (type 1) with double-casement style (standard French window)
+        let itemMetaData = {
+            itemName: "Fenetre",
+            isParametric: true,
+            baseParametricType: "WINDOW",
+            subParametricData: {
+                type: 1, // ProceduralWindow
+                width: 120,
+                height: windowHeight,
+                frameThickness: 5,
+                frameDepth: 7,
+                windowType: 'double-casement', // Double battant standard
+                gridCols: 1,
+                gridRows: 2, // 2 carreaux par battant
+                muntinWidth: 2,
+                handleType: 'olive',
+                frameColor: '#FFFFFF',
+                handleColor: '#C0C0C0',
+                glassColor: '#88CCFF',
+                glassOpacity: 0.3,
+                showOuterFrame: true,
+                outerFrameWidth: 6,
+                outerFrameColor: '#E8E8E8',
+                openAmount: 0
+            },
+            itemType: 7,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            size: [120, windowHeight, 7],
+            fixed: false,
+            resizable: false,
+            // Don't set wall here - snapToWall will handle the wall association
+        };
+
+        console.log('[addWindowAtPosition] Creating window with metadata:', itemMetaData);
+        console.log('[addWindowAtPosition] wallCenterPoint:', wallCenterPoint);
+        let item = new InWallFloorItem(this.__model, itemMetaData);
+        this.__model.addItem(item);
+        item.snapToWall(wallCenterPoint, wall, wallEdge);
+        console.log('[addWindowAtPosition] Window positioned at:', item.position);
+
+        return true;
+    }
+
+    get floorplan() {
+        return this.__floorplan;
     }
 }
