@@ -14,6 +14,7 @@ export const useViewerStore = create(
         // Selection state
         selectedItem: null,
         hoveredItem: null,
+        isTransforming: false, // True when dragging with TransformControls
 
         // Room data
         rooms: [],
@@ -67,6 +68,7 @@ export const useViewerStore = create(
         },
 
         setHoveredItem: (item) => set({ hoveredItem: item }),
+        setIsTransforming: (isTransforming) => set({ isTransforming }),
 
         // Room management
         setRooms: (rooms) => set({ rooms }),

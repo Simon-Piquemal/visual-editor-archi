@@ -247,8 +247,13 @@ function SceneContent({ model, options, onItemSelected, onWallClicked, onRoomCli
                 <Physical3DItem
                     key={item.uuid || index}
                     itemModel={item}
+                    onMount={(physicalItem) => {
+                        // Add to draggable items list if not already there
+                        if (!physicalItemsRef.current.includes(physicalItem)) {
+                            physicalItemsRef.current.push(physicalItem);
+                        }
+                    }}
                     onSelect={(physicalItem) => {
-                        physicalItemsRef.current.push(physicalItem);
                         onItemSelected?.(physicalItem, item);
                     }}
                 />

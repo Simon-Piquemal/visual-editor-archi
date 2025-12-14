@@ -27,6 +27,8 @@ export function useDragControls({
     const selectedRef = useRef(null);
     const timestampRef = useRef(Date.now());
     const isDragging = useRef(false);
+    const dragStartPos = useRef(new THREE.Vector2());
+    const hasMoved = useRef(false);
 
     const selectItem = useViewerStore((state) => state.selectItem);
     const deselectItem = useViewerStore((state) => state.deselectItem);
@@ -89,6 +91,8 @@ export function useDragControls({
 
             selectedRef.current = itemIntersections[0].object;
             isDragging.current = true;
+            hasMoved.current = false;
+            dragStartPos.current.set(event.clientX, event.clientY);
 
             // Setup drag plane
             plane.current.setFromNormalAndCoplanarPoint(
@@ -118,6 +122,15 @@ export function useDragControls({
 
     const handlePointerMove = useCallback((event) => {
         if (!enabled || !isDragging.current || !selectedRef.current) return;
+
+        // Check if we've moved enough to start dragging (5 pixel threshold)
+        if (!hasMoved.current) {
+            const dx = event.clientX - dragStartPos.current.x;
+            const dy = event.clientY - dragStartPos.current.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 5) return;
+            hasMoved.current = true;
+        }
 
         updateMouse(event);
         raycaster.current.setFromCamera(mouse.current, camera);
