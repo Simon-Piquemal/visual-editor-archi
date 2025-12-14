@@ -39,7 +39,7 @@ function DraggableTexture({ texture, type, onClick }) {
         });
         e.dataTransfer.setData('application/x-texture', dragData);
         e.dataTransfer.effectAllowed = 'copy';
-        
+
         // Create a colored drag image
         const dragEl = document.createElement('div');
         dragEl.style.width = '40px';
@@ -51,7 +51,7 @@ function DraggableTexture({ texture, type, onClick }) {
         dragEl.style.top = '-1000px';
         document.body.appendChild(dragEl);
         e.dataTransfer.setDragImage(dragEl, 20, 20);
-        
+
         // Clean up after drag starts
         setTimeout(() => document.body.removeChild(dragEl), 0);
     }, [texture, type]);
