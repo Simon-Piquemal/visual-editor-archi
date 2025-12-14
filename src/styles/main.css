@@ -581,6 +581,17 @@ html, body {
     border-color: var(--border-light);
 }
 
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
 /* Empty State */
 .empty-state {
     display: flex;

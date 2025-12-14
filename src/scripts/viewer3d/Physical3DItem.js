@@ -40,7 +40,7 @@ export class Physical3DItem extends Mesh {
                 options[opt] = opts[opt];
             }
         }
-        let boxHelperMaterial = new LineBasicMaterial({ color: 0x0000F0, linewidth: 2, transparent: true });
+        let boxHelperMaterial = new LineBasicMaterial({ color: 0x00FF00, linewidth: 3, transparent: true, depthTest: false });
         this.__options = options;
         this.__itemModel = itemModel;
         this.__dragControls = dragControls;
@@ -126,12 +126,26 @@ export class Physical3DItem extends Mesh {
         let m = new Matrix4();
         m = m.makeTranslation(-localCenter.x, -localCenter.y, -localCenter.z);
 
+        // Update the boxhelper geometry
+        this.__boxhelper.geometry.dispose();
         this.__boxhelper.geometry = new EdgesGeometry(new BoxGeometry(this.__size.x, this.__size.y, this.__size.z));
-        // this.__boxhelper.geometry.applyMatrix4(m);
 
         this.__boxhelper.rotation.x = this.__itemModel.combinedRotation.x;
         this.__boxhelper.rotation.y = this.__itemModel.combinedRotation.y;
         this.__boxhelper.rotation.z = this.__itemModel.combinedRotation.z;
+
+        // Update the collision geometry
+        this.geometry.dispose();
+        this.geometry = new BoxGeometry(this.__size.x, this.__size.y, this.__size.z, 1, 1, 1);
+        this.geometry.computeBoundingBox();
+
+        // Update item statistics (dimension arrows)
+        if (this.__itemStatistics) {
+            this.__itemStatistics.recalculateSize();
+        }
+
+        // Update halfSize on the mesh for proper collision detection
+        this.halfSize = this.__itemModel.halfSize;
     }
 
     __itemUpdated(evt) {

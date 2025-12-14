@@ -467,51 +467,37 @@ export class HalfEdge extends EventDispatcher {
 
 
     /**
-     * Return the 2D exterior location that is at the start. 
+     * Return the 2D exterior location that is at the start.
+     * Uses line-line intersection for proper corner geometry at any angle.
      * @return {Vector2} Return an object with attributes x, y
      * @see https://threejs.org/docs/#api/en/math/Vector2
      */
     __exteriorStart(debug = false) {
-        let vec = this.getEnd().location.clone().sub(this.getStart().location).normalize();
-        let point = this.getStart().location.clone();
-        vec.rotateAround(new Vector2(), -2.356194490192345);
-        vec.multiplyScalar(WALL_OFFSET_THICKNESS);
-        if(this.wall.attachedRooms.length > 1){
-            vec.multiplyScalar(0);
+        // If wall is shared between multiple rooms, no exterior offset needed
+        if (this.wall.attachedRooms.length > 1) {
+            return this.getStart().location.clone();
         }
-        point.add(vec);
-        // let vec = this.interiorPointByEdges(this, this.prev);
-        // return this.getStart().location.clone().add(vec.negate().normalize().multiplyScalar(WALL_OFFSET_THICKNESS)); 
 
-        // let vec = this.halfAngleVector(this.prev, this);
-        // return new Vector2(this.getStart().x - vec.x, this.getStart().y - vec.y);
-
-        return point;//new Vector2(this.getStart().x, this.getStart().y);
+        // Use the same line-intersection approach as interior, but with negative offset (exterior side)
+        let vec = this.exteriorPointByEdges(this, this.prev, debug);
+        return this.getStart().location.clone().add(vec);
     }
 
     /**
-     * Return the 2D exterior location that is at the end. 
+     * Return the 2D exterior location that is at the end.
+     * Uses line-line intersection for proper corner geometry at any angle.
      * @return {Vector2} Return an object with attributes x, y
      * @see https://threejs.org/docs/#api/en/math/Vector2
      */
     __exteriorEnd(debug = false) {
-        let vec = this.getEnd().location.clone().sub(this.getStart().location).normalize();
-        let point = this.getEnd().location.clone();
-        vec.rotateAround(new Vector2(), -0.7853981633974483);
-        vec.multiplyScalar(WALL_OFFSET_THICKNESS);
-        if(this.wall.attachedRooms.length > 1){
-            vec.multiplyScalar(0);
+        // If wall is shared between multiple rooms, no exterior offset needed
+        if (this.wall.attachedRooms.length > 1) {
+            return this.getEnd().location.clone();
         }
-        point.add(vec);
 
-        // let vec = this.interiorPointByEdges(this.next, this);
-        // return this.getEnd().location.clone().add(vec.negate().normalize().multiplyScalar(WALL_OFFSET_THICKNESS));
-
-
-        // let vec = this.halfAngleVector(this, this.next);
-        // return new Vector2(this.getEnd().x - vec.x, this.getEnd().y - vec.y);
-
-        return point;//new Vector2(this.getEnd().x, this.getEnd().y);
+        // Use the same line-intersection approach as interior, but with negative offset (exterior side)
+        let vec = this.exteriorPointByEdges(this.next, this, debug);
+        return this.getEnd().location.clone().add(vec);
     }
 
     /**
@@ -585,63 +571,152 @@ export class HalfEdge extends EventDispatcher {
     }
 
     /**
-     * 
-     * @param {HalfEdge} v1 
-     * @param {HalfEdge} v2 
-     * @param {Boolean} debug 
-     * @returns {Vector2}
-     * @description Find wall ends based on line-line intersections
+     * Advanced corner point calculation using angle bisector method.
+     * This algorithm works correctly for any angle (acute, right, obtuse).
+     * Uses the mathematical principle: offset_distance = thickness / sin(halfAngle)
+     *
+     * @param {HalfEdge} v1 - First edge (ends at the shared corner)
+     * @param {HalfEdge} v2 - Second edge (starts at the shared corner)
+     * @param {Boolean} debug - Enable debug logging
+     * @returns {Vector2} - Offset vector from corner point
      */
     interiorPointByEdges(v1, v2, debug = false) {
-        function orthoNormalizedVector(vect, thickness=1){
-            let cloneVect = vect.clone();
-            cloneVect.rotateAround(new Vector2(), Math.PI * 0.5);
-            cloneVect.normalize();
-            cloneVect.multiplyScalar(thickness);
-            return cloneVect;
-        }
+        // Fallback for missing edges
         if (!v1 || !v2) {
-            // throw new Error('Need a valid next or previous edge');            
-            // console.warn('Need a valid next or previous edge');
-            return this.halfAngleVector(v1, v2);//.multiplyScalar(2.0);
+            return this.halfAngleVector(v1, v2);
         }
-        let multiplier = 5.0;
-        let v1Thickness = v1.wall.thickness - WALL_OFFSET_THICKNESS;
-        let v2Thickness = v2.wall.thickness - WALL_OFFSET_THICKNESS;
-        
-        let u = v1.getEnd().location.clone().sub(v1.getStart().location);
-        let v = v2.getEnd().location.clone().sub(v2.getStart().location);
 
-        let startV1 = v1.getStart().location.clone().add(u.clone().negate().multiplyScalar(multiplier));
-        let endV1 = v1.getEnd().location.clone().add(u.clone().multiplyScalar(multiplier));
+        // Get wall directions normalized
+        let dir1 = v1.getEnd().location.clone().sub(v1.getStart().location).normalize();
+        let dir2 = v2.getEnd().location.clone().sub(v2.getStart().location).normalize();
 
-        let startV2 = v2.getStart().location.clone().add(v.clone().negate().multiplyScalar(multiplier));
-        let endV2 = v2.getEnd().location.clone().add(v.clone().multiplyScalar(multiplier));
+        // v1 points INTO the corner, v2 points OUT of the corner
+        // For interior calculation, we need the angle between incoming and outgoing
+        let incomingDir = dir1.clone().negate(); // Reverse to point towards corner
+        let outgoingDir = dir2.clone();
 
-        let orthoU = orthoNormalizedVector(u, v1Thickness);
-        let orthoV = orthoNormalizedVector(v, v2Thickness);
+        // Calculate dot product for angle
+        let dot = incomingDir.dot(outgoingDir);
+        dot = Math.max(-1, Math.min(1, dot)); // Clamp for numerical stability
 
-        let lineAStart = startV1.clone().add(orthoU);
-        let lineAEnd = endV1.clone().add(orthoU);
-        let lineBStart = startV2.clone().add(orthoV);
-        let lineBEnd = endV2.clone().add(orthoV);
-        
-        let intersection = Utils.lineLineIntersectPoint(lineAStart, lineAEnd, lineBStart, lineBEnd);
-        
-        
-        // let myU = this.getEnd().location.clone().sub(this.getStart().location);
-        // let myOrtho = orthoNormalizedVector(myU);
-        // return myOrtho.multiplyScalar(this.wall.thickness);
-
-        // console.log(this.getStart().location, this.getEnd().location);
-        // console.log(v1.getStart().location, v1.getEnd().location);
-        // console.log(lineAStart, lineAEnd);
-        // console.log('Line - line Intersection ', intersection);
-
-        if(!intersection){
-            return orthoU.normalize().multiplyScalar(this.wall.thickness - WALL_OFFSET_THICKNESS);
+        // Handle near-parallel walls (angle ≈ 0° or ≈ 180°)
+        if (Math.abs(dot) > 0.9999) {
+            let ortho = new Vector2(-dir1.y, dir1.x);
+            let avgThickness = (v1.wall.thickness + v2.wall.thickness) * 0.5 - WALL_OFFSET_THICKNESS;
+            return ortho.multiplyScalar(avgThickness);
         }
-        return intersection.sub(v1.getStart());
+
+        // Calculate angle and half-angle
+        let angle = Math.acos(dot);
+        let halfAngle = angle / 2;
+
+        // Calculate bisector direction
+        let bisector = incomingDir.clone().add(outgoingDir);
+        let bisectorLength = bisector.length();
+
+        if (bisectorLength < 0.0001) {
+            // Walls at exactly 180° - use perpendicular
+            let ortho = new Vector2(-dir1.y, dir1.x);
+            let avgThickness = (v1.wall.thickness + v2.wall.thickness) * 0.5 - WALL_OFFSET_THICKNESS;
+            return ortho.multiplyScalar(avgThickness);
+        }
+        bisector.normalize();
+
+        // Average wall thickness
+        let avgThickness = (v1.wall.thickness + v2.wall.thickness) * 0.5 - WALL_OFFSET_THICKNESS;
+
+        // Calculate distance along bisector: d = thickness / sin(halfAngle)
+        let sinHalfAngle = Math.sin(halfAngle);
+
+        // Cap the multiplier for very acute angles (< ~15°) to prevent extreme offsets
+        let maxMultiplier = 4.0;
+        let multiplier = Math.min(1 / sinHalfAngle, maxMultiplier);
+
+        let distance = avgThickness * multiplier;
+
+        // Create offset vector
+        let offset = bisector.clone().multiplyScalar(distance);
+
+        // Check direction using cross product (determines which side of the corner)
+        let cross = dir1.x * dir2.y - dir1.y * dir2.x;
+        if (cross < 0) {
+            offset.negate();
+        }
+
+        if (debug) {
+            console.log('[interiorPointByEdges] angle:', (angle * 180 / Math.PI).toFixed(1) + '°');
+            console.log('[interiorPointByEdges] halfAngle:', (halfAngle * 180 / Math.PI).toFixed(1) + '°');
+            console.log('[interiorPointByEdges] sinHalfAngle:', sinHalfAngle.toFixed(4));
+            console.log('[interiorPointByEdges] multiplier:', multiplier.toFixed(2));
+            console.log('[interiorPointByEdges] distance:', distance.toFixed(2));
+            console.log('[interiorPointByEdges] cross:', cross.toFixed(4));
+        }
+
+        return offset;
+    }
+
+    /**
+     * Advanced exterior corner point calculation using angle bisector method.
+     * Similar to interiorPointByEdges but calculates the exterior side offset.
+     *
+     * @param {HalfEdge} v1 - First edge
+     * @param {HalfEdge} v2 - Second edge
+     * @param {Boolean} debug - Enable debug logging
+     * @returns {Vector2} - Offset vector from corner point (exterior side)
+     */
+    exteriorPointByEdges(v1, v2, debug = false) {
+        // Fallback for missing edges - use simple perpendicular
+        if (!v1 || !v2) {
+            let direction = this.getEnd().location.clone().sub(this.getStart().location);
+            let ortho = new Vector2(direction.y, -direction.x).normalize();
+            return ortho.multiplyScalar(WALL_OFFSET_THICKNESS);
+        }
+
+        // Get wall directions normalized
+        let dir1 = v1.getEnd().location.clone().sub(v1.getStart().location).normalize();
+        let dir2 = v2.getEnd().location.clone().sub(v2.getStart().location).normalize();
+
+        let incomingDir = dir1.clone().negate();
+        let outgoingDir = dir2.clone();
+
+        let dot = incomingDir.dot(outgoingDir);
+        dot = Math.max(-1, Math.min(1, dot));
+
+        // Handle near-parallel walls
+        if (Math.abs(dot) > 0.9999) {
+            let ortho = new Vector2(dir1.y, -dir1.x); // Opposite direction from interior
+            return ortho.multiplyScalar(WALL_OFFSET_THICKNESS);
+        }
+
+        let angle = Math.acos(dot);
+        let halfAngle = angle / 2;
+
+        let bisector = incomingDir.clone().add(outgoingDir);
+        if (bisector.length() < 0.0001) {
+            let ortho = new Vector2(dir1.y, -dir1.x);
+            return ortho.multiplyScalar(WALL_OFFSET_THICKNESS);
+        }
+        bisector.normalize();
+
+        let sinHalfAngle = Math.sin(halfAngle);
+        let maxMultiplier = 4.0;
+        let multiplier = Math.min(1 / sinHalfAngle, maxMultiplier);
+
+        let distance = WALL_OFFSET_THICKNESS * multiplier;
+        let offset = bisector.clone().multiplyScalar(distance);
+
+        // For exterior, flip based on cross product (opposite from interior)
+        let cross = dir1.x * dir2.y - dir1.y * dir2.x;
+        if (cross > 0) {
+            offset.negate();
+        }
+
+        if (debug) {
+            console.log('[exteriorPointByEdges] angle:', (angle * 180 / Math.PI).toFixed(1) + '°');
+            console.log('[exteriorPointByEdges] offset:', offset);
+        }
+
+        return offset;
     }
 
     /**

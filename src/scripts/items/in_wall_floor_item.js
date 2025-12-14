@@ -52,7 +52,8 @@ export class InWallFloorItem extends InWallItem {
         super.__parametricGeometryUpdate(evt, false);
         if (this.__currentWall && updateForWall) {
             let currentPosition = this.position.clone();
-            currentPosition.y = this.halfSize.y + 5;
+            // Door is centered at y=0, so position.y = halfSize.y puts bottom at floor level
+            currentPosition.y = this.halfSize.y;
             this.position = currentPosition;
             this.__currentWall.addItem(this);
         }

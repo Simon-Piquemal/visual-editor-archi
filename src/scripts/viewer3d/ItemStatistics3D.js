@@ -27,7 +27,7 @@ export class StatisticArrow extends Object3D{
         this.__arrowHeadLength = headLength;
         this.__arrowHeadWidth = headWidth;
 
-        this.__textScaleFactor = 2.75;
+        this.__textScaleFactor = 1.5;  // Smaller, more subtle text
         this.__textColor = textColor;
         this.__textBackgroundColor = textBackgroundColor;
 
@@ -114,14 +114,15 @@ export class StatisticArrow extends Object3D{
         labelElement = labelContext['canvas'];
         labelSize = labelContext['size'];
         canvasTexture = new CanvasTexture(labelElement);
-        // canvasMaterial = new MeshBasicMaterial({map: canvasTexture});
-        canvasMaterial = new SpriteMaterial({map: canvasTexture});
+        // Use MeshBasicMaterial with PlaneGeometry instead of Sprite
+        // This makes the label follow the object's rotation instead of always facing camera
+        canvasMaterial = new MeshBasicMaterial({map: canvasTexture, transparent: true, depthTest: false});
 
         labelHolder = new Group();
-        label3D = new Sprite(canvasMaterial);
-        label3D.scale.set(labelSize.x * this.__textScaleFactor, labelSize.y * this.__textScaleFactor, 1);
-        // label3D = new Mesh(new BoxGeometry(1, 1, 1), canvasMaterial);
-        // label3D.scale.set(labelSize.x, labelSize.y, labelSize.y);
+        // Use a Mesh with PlaneGeometry instead of Sprite for wall-aligned labels
+        const planeGeom = new BoxGeometry(labelSize.x * this.__textScaleFactor, labelSize.y * this.__textScaleFactor, 0.1);
+        label3D = new Mesh(planeGeom, canvasMaterial);
+        label3D.renderOrder = 999; // Render on top
         
         // canvasTexture.anisotropy = 1;
         parentElement.appendChild(labelElement);
@@ -194,16 +195,16 @@ export class ItemStatistics3D extends Mesh {
         super();
         let options = {
             dimension: {
-                headLength: 5,
-                headWidth: 7,
-                unselectedColor: 0xFF0000,
-                selectedColor: 0x00F0F0
+                headLength: 2,
+                headWidth: 3,
+                unselectedColor: 0x888888,
+                selectedColor: 0x00AAFF
             },
             distance: {
-                headLength: 5,
-                headWidth: 7,
-                unselectedColor: 0xFF0000,
-                selectedColor: 0x00F0F0
+                headLength: 2,
+                headWidth: 3,
+                unselectedColor: 0x888888,
+                selectedColor: 0x00AAFF
             },
             offsetToFront: false,
         };
@@ -247,9 +248,10 @@ export class ItemStatistics3D extends Mesh {
         this.__front = new Vector3(0, 0, 1);
         this.__back = new Vector3(0, 0, -1);
 
-        this.__widthLinePosition = new Vector3(-1, 1, 1);
-        this.__heightLinePosition = new Vector3(1, -1, 1);
-        this.__depthLinePosition = new Vector3(1, 1, 1);
+        // Position dimension arrows in the wall plane (z=0) for better visibility
+        this.__widthLinePosition = new Vector3(0, 1.15, 0);   // Width arrow above the item
+        this.__heightLinePosition = new Vector3(1.15, 0, 0);  // Height arrow to the right
+        this.__depthLinePosition = new Vector3(0, 0, 1.15);   // Depth arrow (usually hidden for in-wall items)
 
         this.__upArrow = new StatisticArrow(this.__up.clone(),
             new Vector3(), 1,
@@ -372,6 +374,12 @@ export class ItemStatistics3D extends Mesh {
         this.__widthArrow.position.copy(wPos);
         this.__heightArrow.position.copy(hPos);
         this.__depthArrow.position.copy(dPos);
+
+        // Hide depth arrow for in-wall items (doors/windows) as it's not relevant
+        if (this.__options.offsetToFront) {
+            this.__depthArrow.visible = false;
+        }
+
         if(this.__physicalItem.selected){
             this.__widthArrow.setColor(this.__options.dimension.selectedColor);
             this.__heightArrow.setColor(this.__options.dimension.selectedColor);
@@ -475,6 +483,17 @@ export class ItemStatistics3D extends Mesh {
 
     updateDistances(){
         this.__updateDistanceStatistics();
+    }
+
+    /**
+     * Recalculate item size from the physical item's bounding box.
+     * Call this when the parametric geometry changes (e.g., width/height modified).
+     */
+    recalculateSize() {
+        if (this.__physicalItem && this.__physicalItem.box) {
+            this.__itemHalfSize = this.__physicalItem.box.getSize(new Vector3()).multiplyScalar(0.5);
+            this.__updateDimensionStatistics();
+        }
     }
 
     turnOffDistances(){

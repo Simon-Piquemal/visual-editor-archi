@@ -1,5 +1,3 @@
-import FPS from 'fps-now';
-
 import { BlueprintJS } from './scripts/blueprint.js';
 import { EVENT_LOADED, EVENT_NOTHING_2D_SELECTED, EVENT_CORNER_2D_CLICKED, EVENT_WALL_2D_CLICKED,
     EVENT_ROOM_2D_CLICKED, EVENT_WALL_CLICKED, EVENT_ROOM_CLICKED, EVENT_NO_ITEM_SELECTED,
@@ -127,6 +125,13 @@ const elements = {
     roomWallTextureColor: $('room-wall-texture-color'),
     btnApplyRoomWallsTexture: $('btn-apply-room-walls-texture'),
 
+    // 3D Item properties
+    propsItem3D: $('props-item-3d'),
+    itemIcon: $('item-icon'),
+    itemTitle: $('item-title'),
+    itemPropertiesContainer: $('item-properties-container'),
+    btnDeleteItem: $('btn-delete-item'),
+
     // Status
     statusMode: $('status-mode'),
     statusUnit: $('status-unit'),
@@ -150,16 +155,31 @@ const elements = {
 };
 
 // ========================================
-// FPS Counter
+// FPS Counter (manual implementation)
 // ========================================
-const fps = FPS.of({ x: 0, y: 0 });
-fps.start();
+let frameCount = 0;
+let lastFpsUpdate = performance.now();
+let currentFps = 0;
 
-setInterval(() => {
-    if (elements.fpsCounter) {
-        elements.fpsCounter.textContent = `${Math.round(fps.rate)} FPS`;
+function updateFpsCounter() {
+    frameCount++;
+    const now = performance.now();
+    const elapsed = now - lastFpsUpdate;
+
+    if (elapsed >= 500) {
+        currentFps = Math.round((frameCount * 1000) / elapsed);
+        frameCount = 0;
+        lastFpsUpdate = now;
+
+        if (elements.fpsCounter) {
+            elements.fpsCounter.textContent = `${currentFps} FPS`;
+        }
     }
-}, 500);
+
+    requestAnimationFrame(updateFpsCounter);
+}
+
+requestAnimationFrame(updateFpsCounter);
 
 // ========================================
 // Utility Functions
@@ -276,7 +296,127 @@ function hideAll2DProps() {
 function hideAll3DProps() {
     elements.propsWall3D.classList.add('hidden');
     elements.propsRoom3D.classList.add('hidden');
+    elements.propsItem3D.classList.add('hidden');
     elements.noSelection3D.classList.add('hidden');
+}
+
+// Current selected item for property editing
+let currentSelectedItem = null;
+
+/**
+ * Build property controls for a parametric item (door/window)
+ */
+function buildItemPropertiesUI(itemModel, parametricClass) {
+    const container = elements.itemPropertiesContainer;
+    container.innerHTML = '';
+
+    if (!parametricClass || !parametricClass.parameters) {
+        container.innerHTML = '<p class="text-muted">Pas de proprietes disponibles</p>';
+        return;
+    }
+
+    const parameters = parametricClass.parameters;
+
+    for (let propName in parameters) {
+        const propDef = parameters[propName];
+        const currentValue = parametricClass[propName];
+
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.textContent = propDef.label || propName;
+        formGroup.appendChild(label);
+
+        let input;
+
+        switch (propDef.type) {
+            case 'color':
+                input = document.createElement('input');
+                input.type = 'color';
+                input.className = 'color-input';
+                input.value = currentValue || '#FFFFFF';
+                input.addEventListener('input', (e) => {
+                    parametricClass[propName] = e.target.value;
+                    blueprint3d.roomplanner.needsUpdate = true;
+                });
+                break;
+
+            case 'range':
+                const rangeWrapper = document.createElement('div');
+                rangeWrapper.className = 'range-input';
+
+                input = document.createElement('input');
+                input.type = 'range';
+                input.min = propDef.min || 0;
+                input.max = propDef.max || 100;
+                input.step = propDef.step || 1;
+                input.value = currentValue || propDef.min || 0;
+
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'range-value';
+                valueSpan.textContent = input.value;
+
+                input.addEventListener('input', (e) => {
+                    valueSpan.textContent = e.target.value;
+                    parametricClass[propName] = parseFloat(e.target.value);
+                    blueprint3d.roomplanner.needsUpdate = true;
+                });
+
+                rangeWrapper.appendChild(input);
+                rangeWrapper.appendChild(valueSpan);
+                formGroup.appendChild(rangeWrapper);
+                container.appendChild(formGroup);
+                continue; // Skip the default append
+
+            case 'choice':
+                input = document.createElement('select');
+                input.className = 'select';
+                const options = propDef.value || [];
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    if (opt === currentValue) option.selected = true;
+                    input.appendChild(option);
+                });
+                input.addEventListener('change', (e) => {
+                    parametricClass[propName] = e.target.value;
+                    blueprint3d.roomplanner.needsUpdate = true;
+                });
+                break;
+
+            case 'boolean':
+                const toggleLabel = document.createElement('label');
+                toggleLabel.className = 'toggle-label';
+                toggleLabel.innerHTML = `
+                    <span>${propDef.label || propName}</span>
+                    <input type="checkbox" ${currentValue ? 'checked' : ''}>
+                    <span class="toggle"></span>
+                `;
+                toggleLabel.querySelector('input').addEventListener('change', (e) => {
+                    parametricClass[propName] = e.target.checked;
+                    blueprint3d.roomplanner.needsUpdate = true;
+                });
+                formGroup.innerHTML = '';
+                formGroup.appendChild(toggleLabel);
+                container.appendChild(formGroup);
+                continue; // Skip the default append
+
+            default:
+                input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'input';
+                input.value = currentValue || 0;
+                input.addEventListener('change', (e) => {
+                    parametricClass[propName] = parseFloat(e.target.value);
+                    blueprint3d.roomplanner.needsUpdate = true;
+                });
+        }
+
+        formGroup.appendChild(input);
+        container.appendChild(formGroup);
+    }
 }
 
 function updateAddElementHint() {
@@ -568,6 +708,16 @@ function bindEvents() {
     elements.btnMove.addEventListener('click', switchToMoveMode);
     elements.btnTransform.addEventListener('click', switchToTransformMode);
     elements.btnDelete.addEventListener('click', () => floorplanningHelper.deleteCurrentItem());
+
+    // Delete 3D item button
+    elements.btnDeleteItem.addEventListener('click', () => {
+        if (currentSelectedItem) {
+            blueprint3d.model.removeItem(currentSelectedItem);
+            currentSelectedItem = null;
+            hideAll3DProps();
+            elements.noSelection3D.classList.remove('hidden');
+        }
+    });
 
     // File operations
     elements.btnLoad.addEventListener('click', () => elements.fileInput.click());
@@ -931,14 +1081,36 @@ function bindBlueprintEvents() {
         }
 
         const itemModel = evt.itemModel;
-        if (itemModel.isParametric) {
-            parametricContextInterface = new ParametricsInterface(itemModel.parametricClass, blueprint3d.roomplanner);
+        currentSelectedItem = itemModel;
+
+        if (itemModel && itemModel.isParametric) {
+            // Show the item properties panel
+            elements.propsItem3D.classList.remove('hidden');
+
+            // Determine item type for icon and title
+            const baseType = itemModel.baseParametricType;
+            if (baseType === 'DOOR') {
+                elements.itemIcon.textContent = 'door_front';
+                elements.itemTitle.textContent = itemModel.metadata.itemName || 'Porte';
+            } else if (baseType === 'WINDOW') {
+                elements.itemIcon.textContent = 'window';
+                elements.itemTitle.textContent = itemModel.metadata.itemName || 'Fenetre';
+            } else {
+                elements.itemIcon.textContent = 'category';
+                elements.itemTitle.textContent = itemModel.metadata.itemName || 'Element';
+            }
+
+            // Build the property controls
+            buildItemPropertiesUI(itemModel, itemModel.parametricClass);
+        } else {
+            elements.noSelection3D.classList.remove('hidden');
         }
     });
 
     blueprint3d.roomplanner.addRoomplanListener(EVENT_NO_ITEM_SELECTED, () => {
         hideAll3DProps();
         elements.noSelection3D.classList.remove('hidden');
+        currentSelectedItem = null;
 
         if (parametricContextInterface) {
             parametricContextInterface.destroy();
