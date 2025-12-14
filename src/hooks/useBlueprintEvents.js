@@ -1,5 +1,11 @@
 import { useEffect } from 'react';
 import { useAppStore, ElementTypes } from '../stores/appStore';
+import {
+    EVENT_WALL_2D_CLICKED,
+    EVENT_CORNER_2D_CLICKED,
+    EVENT_ROOM_2D_CLICKED,
+    EVENT_NOTHING_2D_SELECTED,
+} from '../scripts/core/events';
 
 /**
  * Hook to listen to BlueprintJS events and sync with React state
@@ -16,6 +22,7 @@ export function useBlueprintEvents() {
 
         const model = blueprint.model;
         const floorplan = model.floorplan;
+        const floorplanner = blueprint.floorplanner;
 
         // Model events
         const handleLoading = () => {
@@ -54,6 +61,29 @@ export function useBlueprintEvents() {
             deselectElement();
         };
 
+        // 2D Selection events - sync with React store
+        const handleWall2DClicked = (evt) => {
+            if (evt.item) {
+                selectElement(evt.item, ElementTypes.WALL);
+            }
+        };
+
+        const handleCorner2DClicked = (evt) => {
+            if (evt.item) {
+                selectElement(evt.item, ElementTypes.CORNER);
+            }
+        };
+
+        const handleRoom2DClicked = (evt) => {
+            if (evt.item) {
+                selectElement(evt.item, ElementTypes.ROOM);
+            }
+        };
+
+        const handleNothing2DSelected = () => {
+            deselectElement();
+        };
+
         // Add model listeners
         model.addEventListener?.('EVENT_LOADING', handleLoading);
         model.addEventListener?.('EVENT_LOADED', handleLoaded);
@@ -65,6 +95,14 @@ export function useBlueprintEvents() {
             floorplan.addEventListener?.('EVENT_ROOM_DELETED', handleRoomDeleted);
             floorplan.addEventListener?.('EVENT_CORNER_DELETED', handleCornerDeleted);
             floorplan.addEventListener?.('EVENT_WALL_DELETED', handleWallDeleted);
+        }
+
+        // Add 2D viewer selection listeners
+        if (floorplanner) {
+            floorplanner.addFloorplanListener?.(EVENT_WALL_2D_CLICKED, handleWall2DClicked);
+            floorplanner.addFloorplanListener?.(EVENT_CORNER_2D_CLICKED, handleCorner2DClicked);
+            floorplanner.addFloorplanListener?.(EVENT_ROOM_2D_CLICKED, handleRoom2DClicked);
+            floorplanner.addFloorplanListener?.(EVENT_NOTHING_2D_SELECTED, handleNothing2DSelected);
         }
 
         return () => {
@@ -79,6 +117,14 @@ export function useBlueprintEvents() {
                 floorplan.removeEventListener?.('EVENT_ROOM_DELETED', handleRoomDeleted);
                 floorplan.removeEventListener?.('EVENT_CORNER_DELETED', handleCornerDeleted);
                 floorplan.removeEventListener?.('EVENT_WALL_DELETED', handleWallDeleted);
+            }
+
+            // Remove 2D viewer selection listeners
+            if (floorplanner) {
+                floorplanner.removeFloorplanListener?.(EVENT_WALL_2D_CLICKED, handleWall2DClicked);
+                floorplanner.removeFloorplanListener?.(EVENT_CORNER_2D_CLICKED, handleCorner2DClicked);
+                floorplanner.removeFloorplanListener?.(EVENT_ROOM_2D_CLICKED, handleRoom2DClicked);
+                floorplanner.removeFloorplanListener?.(EVENT_NOTHING_2D_SELECTED, handleNothing2DSelected);
             }
         };
     }, [blueprint, selectElement, deselectElement, setStatusMessage, setLoading]);

@@ -168,19 +168,35 @@ function assignMaterialGroups(geometry) {
 
 /**
  * Create cutout geometry for a wall item (door/window)
+ * Converts world coordinates to local wall coordinates
  */
-function createCutoutGeometry(item) {
+function createCutoutGeometry(item, wallStart, wallRotation, wallThickness) {
     const pos = item.position;
     const halfSize = item.halfSize;
 
     // Create box geometry for the cutout
     const width = halfSize.x * 2;
     const height = halfSize.y * 2;
-    const depth = halfSize.z * 2 + 20; // Extra depth to ensure clean cut
+    // Use wall thickness + extra margin for clean cut
+    const depth = wallThickness + 20;
 
     const geometry = new THREE.BoxGeometry(width, height, depth);
 
-    return { geometry, position: pos };
+    // Convert item world position to wall local coordinates
+    // Wall is positioned at wallStart and rotated by wallRotation
+    const worldX = pos.x - wallStart.x;
+    const worldZ = pos.z - wallStart.y; // wallStart.y is actually Z in 3D
+    
+    // Rotate back by wall rotation to get local coordinates
+    const cos = Math.cos(wallRotation);
+    const sin = Math.sin(wallRotation);
+    const localX = worldX * cos + worldZ * sin;
+    const localZ = -worldX * sin + worldZ * cos;
+
+    return { 
+        geometry, 
+        position: { x: localX, y: pos.y, z: localZ } 
+    };
 }
 
 /**
@@ -344,13 +360,24 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
 
     // If there are wall items (doors/windows), use CSG for cutouts
     if (wallItems && wallItems.length > 0) {
+        // Get wall properties for cutout calculation
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const wallRotation = Math.atan2(dy, dx);
+        const wallThickness = wall.thickness || DEFAULT_WALL_THICKNESS;
+
         return (
             <group ref={groupRef} position={position} rotation={rotation}>
                 <mesh castShadow receiveShadow>
                     <Geometry useGroups>
                         <Base geometry={geometry} material={wallMaterials} />
                         {wallItems.map((item, index) => {
-                            const { geometry: cutoutGeom, position: itemPos } = createCutoutGeometry(item);
+                            const { geometry: cutoutGeom, position: itemPos } = createCutoutGeometry(
+                                item, 
+                                start, 
+                                wallRotation, 
+                                wallThickness
+                            );
                             return (
                                 <Subtraction
                                     key={item.id || index}

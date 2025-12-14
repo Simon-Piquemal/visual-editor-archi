@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useAppStore, ViewModes, ToolModes } from '../../stores/appStore';
 import { Button, IconButton } from '../ui';
 import {
@@ -12,6 +12,47 @@ import {
     DocumentPlusIcon,
     TrashIcon,
 } from '@heroicons/react/24/outline';
+
+// Custom SVG icons for door and window
+const DoorIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="5" y="2" width="14" height="20" rx="1" />
+        <line x1="5" y1="22" x2="19" y2="22" />
+        <circle cx="16" cy="12" r="1" fill="currentColor" />
+    </svg>
+);
+
+const WindowIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="3" y="4" width="18" height="16" rx="1" />
+        <line x1="12" y1="4" x2="12" y2="20" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+    </svg>
+);
+
+/**
+ * Draggable element item for doors and windows
+ */
+function DraggableItem({ type, icon: Icon, label, blueprint }) {
+    const handleDragStart = useCallback((e) => {
+        e.dataTransfer.setData('application/x-floorplan-item', type);
+        e.dataTransfer.effectAllowed = 'copy';
+    }, [type]);
+
+    return (
+        <div
+            draggable
+            onDragStart={handleDragStart}
+            className="flex items-center gap-1.5 px-2 py-1.5 bg-surface hover:bg-primary/10 
+                       border border-border rounded cursor-grab active:cursor-grabbing
+                       transition-colors select-none"
+            title={`Glisser-déposer pour ajouter ${label}`}
+        >
+            <Icon className="w-4 h-4" />
+            <span className="text-xs font-medium">{label}</span>
+        </div>
+    );
+}
 
 export function Toolbar() {
     const currentView = useAppStore((s) => s.currentView);
@@ -99,34 +140,54 @@ export function Toolbar() {
 
             {/* Center: Tool modes (2D only) */}
             {currentView === ViewModes.VIEW_2D && (
-                <div className="flex items-center gap-1 bg-background rounded-lg p-0.5">
-                    <Button
-                        size="sm"
-                        variant={toolMode === ToolModes.MOVE ? 'primary' : 'ghost'}
-                        onClick={() => setToolMode(ToolModes.MOVE)}
-                        title="Move mode (M)"
-                    >
-                        <CursorArrowRaysIcon className="w-4 h-4" />
-                        Move
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant={toolMode === ToolModes.DRAW ? 'primary' : 'ghost'}
-                        onClick={() => setToolMode(ToolModes.DRAW)}
-                        title="Draw mode (D)"
-                    >
-                        <PencilIcon className="w-4 h-4" />
-                        Draw
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant={toolMode === ToolModes.TRANSFORM ? 'primary' : 'ghost'}
-                        onClick={() => setToolMode(ToolModes.TRANSFORM)}
-                        title="Transform mode (T)"
-                    >
-                        <ArrowsPointingOutIcon className="w-4 h-4" />
-                        Transform
-                    </Button>
+                <div className="flex items-center gap-3">
+                    {/* Main tools */}
+                    <div className="flex items-center gap-1 bg-background rounded-lg p-0.5">
+                        <Button
+                            size="sm"
+                            variant={toolMode === ToolModes.MOVE ? 'primary' : 'ghost'}
+                            onClick={() => setToolMode(ToolModes.MOVE)}
+                            title="Move mode (M)"
+                        >
+                            <CursorArrowRaysIcon className="w-4 h-4" />
+                            Move
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={toolMode === ToolModes.DRAW ? 'primary' : 'ghost'}
+                            onClick={() => setToolMode(ToolModes.DRAW)}
+                            title="Draw mode (D)"
+                        >
+                            <PencilIcon className="w-4 h-4" />
+                            Draw
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant={toolMode === ToolModes.TRANSFORM ? 'primary' : 'ghost'}
+                            onClick={() => setToolMode(ToolModes.TRANSFORM)}
+                            title="Transform mode (T)"
+                        >
+                            <ArrowsPointingOutIcon className="w-4 h-4" />
+                            Transform
+                        </Button>
+                    </div>
+
+                    {/* Door & Window - Drag & Drop */}
+                    <div className="flex items-center gap-2 bg-background rounded-lg px-2 py-1">
+                        <span className="text-xs text-text-secondary">Glisser:</span>
+                        <DraggableItem 
+                            type="door" 
+                            icon={DoorIcon} 
+                            label="Porte" 
+                            blueprint={blueprint}
+                        />
+                        <DraggableItem 
+                            type="window" 
+                            icon={WindowIcon} 
+                            label="Fenêtre" 
+                            blueprint={blueprint}
+                        />
+                    </div>
                 </div>
             )}
 

@@ -336,9 +336,13 @@ export class FloorPlannerHelper {
 
         // Door height and center position (door centered at y=0, so center Y = height/2)
         const doorHeight = 210;
+        const doorWidth = 90;
+        // Use wall thickness for the door frame depth
+        const wallThickness = wall.thickness || 10;
         let wallCenterPoint = new Vector3(pos.x, doorHeight / 2, pos.y);
 
         console.log('[addDoorAtPosition] wallCenterPoint:', wallCenterPoint);
+        console.log('[addDoorAtPosition] wallThickness:', wallThickness);
 
         // Use new ProceduralDoor (type 7) with panels style for internal doors
         let itemMetaData = {
@@ -347,9 +351,9 @@ export class FloorPlannerHelper {
             baseParametricType: "DOOR",
             subParametricData: {
                 type: 7, // ProceduralDoor
-                width: 90,
+                width: doorWidth,
                 height: doorHeight,
-                thickness: 4,
+                thickness: wallThickness, // Match wall thickness
                 style: 'panels',
                 panelCount: 4,
                 panelDepth: 1,
@@ -368,7 +372,7 @@ export class FloorPlannerHelper {
             position: [0, 0, 0],
             rotation: [0, 0, 0],
             scale: [1, 1, 1],
-            size: [90, 210, 4],
+            size: [doorWidth, doorHeight, wallThickness], // Match wall thickness
             fixed: false,
             resizable: false,
             // Don't set wall here - snapToWall will handle the wall association
@@ -502,10 +506,14 @@ export class FloorPlannerHelper {
         // Window dimensions and position
         // Window is centered at y=0, so we need: centerY = bottomFromFloor + height/2
         // Standard window bottom is ~90cm from floor
+        const windowWidth = 120;
         const windowHeight = 120;
         const windowBottomFromFloor = 100; // 1m from floor
         const windowCenterY = windowBottomFromFloor + windowHeight / 2; // 100 + 60 = 160cm
+        // Use wall thickness for the window frame depth
+        const wallThickness = wall.thickness || 10;
         console.log('[addWindowAtPosition] Window centerY:', windowCenterY);
+        console.log('[addWindowAtPosition] wallThickness:', wallThickness);
         let wallCenterPoint = new Vector3(pos.x, windowCenterY, pos.y);
 
         // Use new ProceduralWindow (type 1) with double-casement style (standard French window)
@@ -515,10 +523,10 @@ export class FloorPlannerHelper {
             baseParametricType: "WINDOW",
             subParametricData: {
                 type: 1, // ProceduralWindow
-                width: 120,
+                width: windowWidth,
                 height: windowHeight,
                 frameThickness: 5,
-                frameDepth: 7,
+                frameDepth: wallThickness, // Match wall thickness
                 windowType: 'double-casement', // Double battant standard
                 gridCols: 1,
                 gridRows: 2, // 2 carreaux par battant
@@ -537,7 +545,7 @@ export class FloorPlannerHelper {
             position: [0, 0, 0],
             rotation: [0, 0, 0],
             scale: [1, 1, 1],
-            size: [120, windowHeight, 7],
+            size: [windowWidth, windowHeight, wallThickness], // Match wall thickness
             fixed: false,
             resizable: false,
             // Don't set wall here - snapToWall will handle the wall association

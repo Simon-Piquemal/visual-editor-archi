@@ -10,6 +10,8 @@ export const ToolModes = {
     MOVE: 'move',
     DRAW: 'draw',
     TRANSFORM: 'transform',
+    ADD_DOOR: 'add_door',
+    ADD_WINDOW: 'add_window',
 };
 
 export const ElementTypes = {
@@ -56,9 +58,32 @@ export const useAppStore = create(
                     case ToolModes.TRANSFORM:
                         blueprint.switchViewer2DToTransform();
                         break;
+                    case ToolModes.ADD_DOOR:
+                    case ToolModes.ADD_WINDOW:
+                        // Stay in move mode but enable element placement
+                        blueprint.setViewer2DModeToMove();
+                        break;
                 }
             }
             set({ toolMode: mode });
+        },
+
+        // Add door to selected wall
+        addDoorToSelectedWall: (doorType = 1) => {
+            const { blueprint } = get();
+            if (blueprint?.floorplanningHelper) {
+                return blueprint.floorplanningHelper.addDoorToSelectedWall(doorType);
+            }
+            return false;
+        },
+
+        // Add window to selected wall
+        addWindowToSelectedWall: () => {
+            const { blueprint } = get();
+            if (blueprint?.floorplanningHelper) {
+                return blueprint.floorplanningHelper.addWindowToSelectedWall();
+            }
+            return false;
         },
 
         // Selected element
