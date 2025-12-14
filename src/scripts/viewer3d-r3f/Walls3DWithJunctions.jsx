@@ -239,7 +239,21 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
         });
 
         // Wall normal for visibility/opacity culling
-        const wallNormal = new THREE.Vector3(-dy, 0, dx).normalize();
+        // The normal should point towards the room (interior)
+        // If wall has a frontEdge (room on front side), normal points to front (+Z local)
+        // If wall only has backEdge, normal points to back (-Z local)
+        let wallNormal;
+        
+        if (wall.frontEdge && !wall.backEdge) {
+            // Room is on the front side - normal points outward from room
+            wallNormal = new THREE.Vector3(-dy, 0, dx).normalize();
+        } else if (wall.backEdge && !wall.frontEdge) {
+            // Room is on the back side - normal points the other way
+            wallNormal = new THREE.Vector3(dy, 0, -dx).normalize();
+        } else {
+            // Both sides have rooms (internal wall) or no room info - default
+            wallNormal = new THREE.Vector3(-dy, 0, dx).normalize();
+        }
 
         // Get wall items (doors, windows)
         const items = wall.inWallItems || [];

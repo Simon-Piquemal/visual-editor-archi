@@ -158,9 +158,8 @@ export function Skybox() {
 
     return (
         <group name="Skybox">
-            {/* SkyDome removed - was causing large white square */}
+            {/* SkyDome and GroundPlane removed - causing visual artifacts */}
             <GridLines gridSize={gridSize} spacing={gridSpacing} />
-            <GroundPlane gridSize={gridSize} />
         </group>
     );
 }
