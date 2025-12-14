@@ -14,7 +14,7 @@ export function Sidebar() {
 
     if (sidebarCollapsed) {
         return (
-            <aside className="w-10 bg-surface border-l border-border flex flex-col items-center py-2">
+            <aside className="w-10 bg-surface border-l border-border flex flex-col items-center py-2 relative z-20">
                 <button
                     onClick={toggleSidebar}
                     className="p-2 hover:bg-surface-hover rounded-md text-text-secondary hover:text-text transition-colors"
@@ -27,7 +27,7 @@ export function Sidebar() {
     }
 
     return (
-        <aside className="w-sidebar bg-surface border-l border-border flex flex-col overflow-hidden">
+        <aside className="w-sidebar bg-surface border-l border-border flex flex-col overflow-hidden relative z-20">
             {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                 <span className="text-sm font-medium text-text">Properties</span>

@@ -276,8 +276,12 @@ export function Viewer3D({
     className,
 }) {
     const containerRef = useRef();
+    const canvasRef = useRef();
+    const cameraRef = useRef();
+    const sceneRef = useRef();
     const setModel = useViewerStore((state) => state.setModel);
     const setEnabled = useViewerStore((state) => state.setEnabled);
+    const setNeedsUpdate = useViewerStore((state) => state.setNeedsUpdate);
 
     const mergedOptions = useMemo(() => ({
         occludedRoofs: false,
@@ -302,6 +306,91 @@ export function Viewer3D({
         };
     }, [model, setModel, setEnabled]);
 
+    // Handle drag over for texture drops
+    const handleDragOver = useCallback((e) => {
+        if (e.dataTransfer.types.includes('application/x-texture')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        }
+    }, []);
+
+    // Handle texture drop on 3D view
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+
+        const textureDataStr = e.dataTransfer.getData('application/x-texture');
+        if (!textureDataStr) return;
+
+        try {
+            const textureData = JSON.parse(textureDataStr);
+            const { type, color } = textureData;
+
+            // Get mouse position relative to canvas
+            const rect = containerRef.current.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            // Raycast to find what was hit
+            if (!cameraRef.current || !sceneRef.current) return;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, cameraRef.current);
+
+            // Get all meshes in the scene
+            const meshes = [];
+            sceneRef.current.traverse((child) => {
+                if (child.isMesh) {
+                    meshes.push(child);
+                }
+            });
+
+            const intersects = raycaster.intersectObjects(meshes, false);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const hitObject = hit.object;
+
+                // Get model references from userData
+                const userData = hitObject.userData || {};
+                const room = userData.room;
+                const wall = userData.wall;
+                const objectType = userData.type;
+
+                // Apply color based on texture type and hit object
+                if (type === 'floor' && objectType === 'floor' && room) {
+                    // Apply to floor and save in model
+                    applyColorToMaterial(hitObject, color);
+                    room.setTextureMaps({ color: color });
+                    console.log('[Viewer3D] Applied and saved floor color:', color, 'to room:', room.name);
+                } else if (type === 'wall' && objectType === 'wall' && wall) {
+                    // Apply to wall and save in model
+                    applyColorToMaterial(hitObject, color);
+                    // Save texture to both front and back edges if they exist
+                    if (wall.frontEdge) {
+                        wall.frontEdge.setTextureMaps({ color: color });
+                    }
+                    if (wall.backEdge) {
+                        wall.backEdge.setTextureMaps({ color: color });
+                    }
+                    // Also set wall textures directly
+                    wall.frontTexture = { color: color };
+                    wall.backTexture = { color: color };
+                    console.log('[Viewer3D] Applied and saved wall color:', color);
+                } else {
+                    // Apply visually even if we can't save to model
+                    applyColorToMaterial(hitObject, color);
+                    console.log('[Viewer3D] Applied color to surface (not saved):', color);
+                }
+
+                setNeedsUpdate(true);
+            }
+        } catch (error) {
+            console.error('[Viewer3D] Error handling texture drop:', error);
+        }
+    }, [setNeedsUpdate]);
+
     return (
         <div
             ref={containerRef}
@@ -311,6 +400,8 @@ export function Viewer3D({
                 ...style,
             }}
             className={className}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
         >
             <Canvas
                 shadows
@@ -328,10 +419,12 @@ export function Viewer3D({
                     far: 100000,
                     position: [0, 600, 1500],
                 }}
-                onCreated={({ gl }) => {
+                onCreated={({ gl, camera, scene }) => {
                     gl.setClearColor(0xf8f8f8, 1);
                     gl.shadowMap.enabled = true;
                     gl.shadowMap.type = THREE.PCFSoftShadowMap;
+                    cameraRef.current = camera;
+                    sceneRef.current = scene;
                 }}
             >
                 <SceneContent
@@ -344,6 +437,20 @@ export function Viewer3D({
             </Canvas>
         </div>
     );
+}
+
+// Helper function to apply color to a material
+function applyColorToMaterial(mesh, colorHex) {
+    if (!mesh || !mesh.material) return;
+
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+
+    materials.forEach((material) => {
+        if (material.color) {
+            material.color.set(colorHex);
+            material.needsUpdate = true;
+        }
+    });
 }
 
 export default Viewer3D;

@@ -14,7 +14,7 @@ export function Panel({
     const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
     return (
-        <div className={`bg-surface border border-border rounded-lg overflow-hidden ${className}`}>
+        <div className={`bg-[#222222] border border-border rounded-lg overflow-hidden ${className}`}>
             {title && (
                 <div
                     className={`

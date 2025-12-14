@@ -416,6 +416,8 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
                     castShadow
                     receiveShadow
                     key={`wall-csg-${wallId}-${quantizedOpacity}`}
+                    name="wall"
+                    userData={{ wall, type: 'wall' }}
                 >
                     <Geometry useGroups>
                         <Base geometry={geometry} material={wallMaterials} />
@@ -452,6 +454,8 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
                 material={wallMaterials}
                 castShadow
                 receiveShadow
+                name="wall"
+                userData={{ wall, type: 'wall' }}
             />
         </group>
     );
@@ -492,7 +496,7 @@ function JunctionFill({ points, height }) {
     if (!geometry) return null;
 
     return (
-        <mesh geometry={geometry} castShadow receiveShadow>
+        <mesh geometry={geometry} castShadow receiveShadow name="wall">
             <meshStandardMaterial
                 color="#ffffff"
                 side={THREE.DoubleSide}

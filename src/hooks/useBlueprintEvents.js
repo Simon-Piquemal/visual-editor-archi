@@ -75,6 +75,7 @@ export function useBlueprintEvents() {
         };
 
         const handleRoom2DClicked = (evt) => {
+            console.log('[useBlueprintEvents] Room clicked:', evt.item);
             if (evt.item) {
                 selectElement(evt.item, ElementTypes.ROOM);
             }
@@ -99,6 +100,7 @@ export function useBlueprintEvents() {
 
         // Add 2D viewer selection listeners
         if (floorplanner) {
+            console.log('[useBlueprintEvents] Adding 2D selection listeners to floorplanner');
             floorplanner.addFloorplanListener?.(EVENT_WALL_2D_CLICKED, handleWall2DClicked);
             floorplanner.addFloorplanListener?.(EVENT_CORNER_2D_CLICKED, handleCorner2DClicked);
             floorplanner.addFloorplanListener?.(EVENT_ROOM_2D_CLICKED, handleRoom2DClicked);

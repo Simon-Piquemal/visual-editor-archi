@@ -77,6 +77,8 @@ function FloorMesh({ room, scene }) {
             position={[0, 0, 0]}
             receiveShadow
             castShadow
+            name="floor"
+            userData={{ room, type: 'floor' }}
         />
     );
 }
