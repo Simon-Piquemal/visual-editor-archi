@@ -119,7 +119,7 @@ export function findJunctions(walls) {
 /**
  * Calculate the intersection points for walls meeting at a junction
  * @param {Junction} junction
- * @returns {{ wallIntersections: Map<string, { left: Point2D, right: Point2D }> }}
+ * @returns {{ wallIntersections: Map<string, { left: Point2D, right: Point2D }>, fillPolygon: Point2D[] | null }}
  */
 export function calculateJunctionIntersections(junction) {
     const { meetingPoint, connectedWalls } = junction;
@@ -161,8 +161,9 @@ export function calculateJunctionIntersections(junction) {
     processedWalls.sort((a, b) => a.angle - b.angle);
 
     const wallIntersections = new Map();
+    const fillPolygonPoints = [];
     const n = processedWalls.length;
-    if (n < 2) return { wallIntersections };
+    if (n < 2) return { wallIntersections, fillPolygon: null };
 
     // Calculate intersection points between adjacent walls
     for (let i = 0; i < n; i++) {
@@ -179,6 +180,11 @@ export function calculateJunctionIntersections(junction) {
             p = intersection;
         }
 
+        // Collect points for the fill polygon (only for 3+ walls)
+        if (n >= 3) {
+            fillPolygonPoints.push(p);
+        }
+
         if (!wallIntersections.has(wall1.wall_id)) {
             wallIntersections.set(wall1.wall_id, {});
         }
@@ -190,7 +196,10 @@ export function calculateJunctionIntersections(junction) {
         wallIntersections.get(wall2.wall_id).right = p;
     }
 
-    return { wallIntersections };
+    // Only return fill polygon for 3+ walls (where there's actually a hole)
+    const fillPolygon = n >= 3 ? fillPolygonPoints : null;
+
+    return { wallIntersections, fillPolygon };
 }
 
 /**

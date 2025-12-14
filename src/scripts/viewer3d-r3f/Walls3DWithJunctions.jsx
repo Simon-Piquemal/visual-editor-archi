@@ -367,15 +367,61 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
 }
 
 /**
+ * Junction Fill Component - fills the hole at 3+ wall junctions
+ */
+function JunctionFill({ points, height }) {
+    const geometry = useMemo(() => {
+        if (!points || points.length < 3) return null;
+
+        // Create a shape from the polygon points
+        // Points are in world XY coordinates, we need to convert to XZ for 3D
+        // Shape uses 2D coordinates, then we rotate to make it horizontal
+        const shape = new THREE.Shape();
+        
+        // Use x and y from the points (which correspond to world X and Z)
+        shape.moveTo(points[0].x, -points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            shape.lineTo(points[i].x, -points[i].y);
+        }
+        shape.closePath();
+
+        // Extrude the shape to match wall height
+        const extrudeSettings = {
+            depth: height,
+            bevelEnabled: false,
+        };
+        const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+        // Rotate to stand upright - extrude goes up (Y axis)
+        geom.rotateX(-Math.PI / 2);
+
+        return geom;
+    }, [points, height]);
+
+    if (!geometry) return null;
+
+    return (
+        <mesh geometry={geometry} castShadow receiveShadow>
+            <meshStandardMaterial
+                color="#ffffff"
+                side={THREE.DoubleSide}
+                roughness={0.9}
+                metalness={0.0}
+            />
+        </mesh>
+    );
+}
+
+/**
  * Walls3DWithJunctions Component
  * Renders all walls with proper junction handling
  */
 export function Walls3DWithJunctions({ walls = [], occludedWalls = false }) {
     const { scene } = useThree();
 
-    // Calculate junction data for all walls
-    const junctionData = useMemo(() => {
-        if (!walls || walls.length === 0) return new Map();
+    // Calculate junction data for all walls, including fill polygons
+    const { junctionData, fillPolygons } = useMemo(() => {
+        if (!walls || walls.length === 0) return { junctionData: new Map(), fillPolygons: [] };
 
         // Convert wall objects to LiveWall format
         const liveWalls = walls.map((wall) => ({
@@ -387,19 +433,42 @@ export function Walls3DWithJunctions({ walls = [], occludedWalls = false }) {
 
         const junctions = findJunctions(liveWalls);
         const data = new Map();
+        const fills = [];
 
         for (const [key, junction] of junctions.entries()) {
-            const { wallIntersections } = calculateJunctionIntersections(junction);
+            const { wallIntersections, fillPolygon } = calculateJunctionIntersections(junction);
             data.set(key, wallIntersections);
+
+            // Collect fill polygons for 3+ wall junctions
+            if (fillPolygon && fillPolygon.length >= 3) {
+                // Get the height from connected walls - find the actual wall object
+                const connectedWallData = junction.connectedWalls[0];
+                let height = 250; // Default height
+                
+                if (connectedWallData) {
+                    const wallId = connectedWallData.wall?.id;
+                    const wallObj = walls.find(w => (w.id || w.uuid) === wallId);
+                    if (wallObj) {
+                        height = wallObj.height || wallObj.startElevation || 250;
+                    }
+                }
+
+                fills.push({
+                    key,
+                    points: fillPolygon,
+                    height,
+                });
+            }
         }
 
-        return data;
+        return { junctionData: data, fillPolygons: fills };
     }, [walls]);
 
     if (!walls || walls.length === 0) return null;
 
     return (
         <group name="walls-with-junctions">
+            {/* Render walls */}
             {walls.map((wall) => (
                 <WallWithJunction
                     key={wall.id || wall.uuid}
@@ -407,6 +476,15 @@ export function Walls3DWithJunctions({ walls = [], occludedWalls = false }) {
                     junctionData={junctionData}
                     scene={scene}
                     occludedWalls={occludedWalls}
+                />
+            ))}
+
+            {/* Render junction fills for 3+ wall intersections */}
+            {fillPolygons.map((fill) => (
+                <JunctionFill
+                    key={`fill-${fill.key}`}
+                    points={fill.points}
+                    height={fill.height}
                 />
             ))}
         </group>
