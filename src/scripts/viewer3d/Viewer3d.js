@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { WebGLRenderer, PerspectiveCamera, AxesHelper, Scene, RGBFormat, LinearMipmapLinearFilter, sRGBEncoding } from 'three';
+import { WebGLRenderer, PerspectiveCamera, AxesHelper, Scene, RGBFormat, LinearMipmapLinearFilter, SRGBColorSpace } from 'three';
 import { PCFSoftShadowMap, WebGLCubeRenderTarget, CubeCamera, MathUtils, NoToneMapping, ACESFilmicToneMapping } from 'three';
 import { Color, Fog, AmbientLight, DirectionalLight, HemisphereLight } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -97,7 +97,7 @@ export class Viewer3D extends Scene {
 
         let cubeRenderTarget = new WebGLCubeRenderTarget(16, { format: RGBFormat, generateMipmaps: true, minFilter: LinearMipmapLinearFilter });
         scope.__environmentCamera = new CubeCamera(1, 100000, cubeRenderTarget);
-        scope.__environmentCamera.renderTarget.texture.encoding = sRGBEncoding;
+        scope.__environmentCamera.renderTarget.texture.colorSpace = SRGBColorSpace;
 
         scope.renderer = scope.getARenderer();
         scope.domElement.appendChild(scope.renderer.domElement);
@@ -311,7 +311,7 @@ export class Viewer3D extends Scene {
 
         // Modern white background
         renderer.setClearColor(0xf8f8f8, 1);
-        renderer.outputEncoding = sRGBEncoding;
+        renderer.outputColorSpace = SRGBColorSpace;
 
         // Tone mapping for better lighting
         renderer.toneMapping = ACESFilmicToneMapping;

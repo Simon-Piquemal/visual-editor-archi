@@ -1,5 +1,4 @@
-import { Vector2, Vector3,Quaternion,Euler, Plane } from 'three';
-import { Matrix4 } from 'three/build/three.module.js';
+import { Vector2, Vector3, Quaternion, Euler, Plane, Matrix4 } from 'three';
 import { Utils } from '../core/utils.js';
 import { Item, UP_VECTOR } from './item.js';
 

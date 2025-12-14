@@ -11,7 +11,7 @@ import {
     MeshPhysicalMaterial,
     Group
 } from "three";
-import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { EventDispatcher } from "three";
 import { EVENT_PARAMETRIC_GEOMETRY_UPATED } from "../../core/events";
 
@@ -430,7 +430,7 @@ export class ProceduralDoor extends EventDispatcher {
         // Merge each group
         const mergedGroups = [];
         Object.keys(grouped).forEach(matIndex => {
-            const merged = mergeBufferGeometries(grouped[matIndex], false);
+            const merged = mergeGeometries(grouped[matIndex], false);
             if (merged) {
                 mergedGroups.push({ geometry: merged, materialIndex: parseInt(matIndex) });
             }
@@ -440,7 +440,7 @@ export class ProceduralDoor extends EventDispatcher {
         if (mergedGroups.length === 0) return new BufferGeometry();
 
         const allGeoms = mergedGroups.map(g => g.geometry);
-        const finalGeometry = mergeBufferGeometries(allGeoms, true);
+        const finalGeometry = mergeGeometries(allGeoms, true);
 
         // Compute normals
         finalGeometry.computeVertexNormals();

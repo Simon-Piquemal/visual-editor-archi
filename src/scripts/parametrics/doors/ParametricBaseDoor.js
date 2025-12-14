@@ -1,6 +1,6 @@
 import Enum from "es6-enum";
-import { BufferGeometry, Matrix4, Vector3, DoubleSide, Color, BufferGeometryUtils } from "three";
-import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { BufferGeometry, Matrix4, Vector3, DoubleSide, Color } from "three";
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { EventDispatcher } from "three";
 import { EVENT_PARAMETRIC_GEOMETRY_UPATED } from "../../core/events";
 import { DoorHandleGenerator } from "./doorhandles/DoorHandleGenerator";
@@ -161,14 +161,14 @@ export class ParametricBaseDoor extends EventDispatcher {
         }
 
         if(doorGeometries.length){
-            tempGeometry = mergeBufferGeometries([doorGeometries[0]], true);//Maintain all door geometries as same group for material assignment purposes
+            tempGeometry = mergeGeometries([doorGeometries[0]], true);//Maintain all door geometries as same group for material assignment purposes
             if(doorGeometries[1]){
-                tempGeometry = mergeBufferGeometries([tempGeometry, doorGeometries[1]], true);//Maintain all door geometries as same group for material assignment purposes
+                tempGeometry = mergeGeometries([tempGeometry, doorGeometries[1]], true);//Maintain all door geometries as same group for material assignment purposes
             }       
             mergeGeometries.push(tempGeometry);     
         }
 
-        doorGeometry = mergeBufferGeometries(mergeGeometries, true);
+        doorGeometry = mergeGeometries(mergeGeometries, true);
         doorGeometry.computeVertexNormals();
         // doorGeometry.computeFaceNormals();
         doorGeometry.computeBoundingBox();
@@ -287,7 +287,7 @@ export class ParametricBaseDoor extends EventDispatcher {
             let doorRatio = (doorSide === 'Right') ? 1.0 - this.doorRatio : this.doorRatio;
             let front_handle = DoorHandleGenerator.generate_handle(this.__handleType.description, 'Front', doorSide, doorRatio, this.frameWidth, this.frameSize, this.frameThickness, this.__openDirection.description, this.__doorHandleMaterialId);
             let back_handle = DoorHandleGenerator.generate_handle(this.__handleType.description, 'Back', doorSide, doorRatio, this.frameWidth, this.frameSize, this.frameThickness, this.__openDirection.description, this.__doorHandleMaterialId);
-            aDoorGeometry = mergeBufferGeometries([aDoorGeometry, front_handle, back_handle], true);
+            aDoorGeometry = mergeGeometries([aDoorGeometry, front_handle, back_handle], true);
             // aDoorGeometry.merge(front_handle);
             // aDoorGeometry.merge(back_handle);
         }

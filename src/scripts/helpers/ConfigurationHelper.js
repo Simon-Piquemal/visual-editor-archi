@@ -1,4 +1,4 @@
-const { Configuration, gridSpacing, snapTolerance, boundsY, boundsX, dragOnlyY, dragOnlyX, directionalDrag, snapToGrid, itemStatistics, configDimUnit } = require("../core/configuration");
+import { Configuration, gridSpacing, snapTolerance, boundsY, boundsX, dragOnlyY, dragOnlyX, directionalDrag, snapToGrid, itemStatistics, configDimUnit } from "../core/configuration";
 
 export class ConfigurationHelper {
     constructor() {

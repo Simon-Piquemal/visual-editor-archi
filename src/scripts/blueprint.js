@@ -1,7 +1,7 @@
 import { Configuration, configDimUnit } from "./core/configuration";
 import { dimCentiMeter } from "./core/constants";
 import { Model } from "./model/model";
-import { Viewer3D } from "./viewer3d/Viewer3d";
+import { Viewer3D } from "./viewer3d-r3f/Viewer3DWrapper";
 import { Viewer2D, floorplannerModes } from "./viewer2d/Viewer2D";
 import { ConfigurationHelper } from "./helpers/ConfigurationHelper";
 import { FloorPlannerHelper } from "./helpers/FloorplannerHelper";

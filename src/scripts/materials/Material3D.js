@@ -1,4 +1,4 @@
-import { MeshStandardMaterial, TextureLoader, RepeatWrapping, Color, Vector2, sRGBEncoding, CubeReflectionMapping } from 'three';
+import { MeshStandardMaterial, TextureLoader, RepeatWrapping, Color, Vector2, SRGBColorSpace, CubeReflectionMapping } from 'three';
 import { TEXTURE_DEFAULT_REPEAT,TEXTURE_DEFAULT_REFLECTIVE, TEXTURE_DEFAULT_SHININESS } from '../core/constants';
 import { MeshPhysicalMaterial } from 'three';
 
@@ -45,7 +45,7 @@ export class Material3D extends MeshPhysicalMaterial {
     __updateColorMap(texture) {
         if (this.__colorTexture) {
             if(this.__colorTexture.image){
-                this.__colorTexture.encoding = sRGBEncoding;
+                this.__colorTexture.colorSpace = SRGBColorSpace;
                 this.__colorTexture.wrapS = this.__colorTexture.wrapT = RepeatWrapping;
                 this.__colorTexture.repeat.set(this.__uRatio, this.__vRatio);
                 this.__colorTexture.needsUpdate = true;
@@ -59,7 +59,7 @@ export class Material3D extends MeshPhysicalMaterial {
         this.__normalTexture = texture;
         if (this.__normalTexture) {
             if(this.__normalTexture.image){
-                this.__normalTexture.encoding = sRGBEncoding;
+                this.__normalTexture.colorSpace = SRGBColorSpace;
                 this.__normalTexture.wrapS = this.__normalTexture.wrapT = RepeatWrapping;
                 this.__normalTexture.repeat.set(this.__uRatio, this.__vRatio);
                 this.__normalTexture.needsUpdate = true;
@@ -72,7 +72,7 @@ export class Material3D extends MeshPhysicalMaterial {
     __updateRoughnessMap(texture) {
         if (this.__roughnessTexture) {
             if(this.__roughnessTexture.image){
-                this.__roughnessTexture.encoding = sRGBEncoding;
+                this.__roughnessTexture.colorSpace = SRGBColorSpace;
                 this.__roughnessTexture.wrapS = this.__roughnessTexture.wrapT = RepeatWrapping;
                 this.__roughnessTexture.repeat.set(this.__uRatio, this.__vRatio);
                 this.__roughnessTexture.needsUpdate = true;
@@ -85,7 +85,7 @@ export class Material3D extends MeshPhysicalMaterial {
     __updateAmbientMap(texture) {
         if (this.__ambientTexture) {
             if(this.__ambientTexture.image){
-                this.__ambientTexture.encoding = sRGBEncoding;
+                this.__ambientTexture.colorSpace = SRGBColorSpace;
                 this.__ambientTexture.wrapS = this.__ambientTexture.wrapT = RepeatWrapping;
                 this.__ambientTexture.repeat.set(this.__uRatio, this.__vRatio);
                 this.__ambientTexture.needsUpdate = true;
@@ -99,7 +99,7 @@ export class Material3D extends MeshPhysicalMaterial {
     __updateMetallicMap(texture) {
         if (this.__metalTexture) {
             if(this.__metalTexture.image){
-                this.__metalTexture.encoding = sRGBEncoding;
+                this.__metalTexture.colorSpace = SRGBColorSpace;
                 this.__metalTexture.wrapS = this.__metalTexture.wrapT = RepeatWrapping;
                 this.__metalTexture.repeat.set(this.__uRatio, this.__vRatio);
                 this.__metalTexture.needsUpdate = true;
@@ -112,7 +112,7 @@ export class Material3D extends MeshPhysicalMaterial {
     __updateBumpMap(texture) {
         if (this.__bumpTexture) {
              if(this.__bumpTexture.image){
-                this.__bumpTexture.encoding = sRGBEncoding;
+                this.__bumpTexture.colorSpace = SRGBColorSpace;
                 this.__bumpTexture.wrapS = this.__bumpTexture.wrapT = RepeatWrapping;
                 this.__bumpTexture.repeat.set(this.__uRatio, this.__vRatio);
                 this.__bumpTexture.roughness =  this.__reflective;
@@ -198,7 +198,7 @@ export class Material3D extends MeshPhysicalMaterial {
                     if (obj.texture != '') {
                         let repeat = (obj.repeat) ? obj.repeat : 1;
                         let txt = new TextureLoader().load(obj.texture);
-                        txt.encoding=sRGBEncoding;
+                        txt.colorSpace=SRGBColorSpace;
                         txt.wrapS = RepeatWrapping;
                         txt.wrapT = RepeatWrapping;
                         txt.repeat.set(repeat, repeat);

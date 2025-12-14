@@ -1,4 +1,4 @@
-import { EventDispatcher, Vector2, Vector3, Shape, ShapeGeometry, Mesh, MeshBasicMaterial, DoubleSide, Box3, FrontSide } from 'three';
+import { EventDispatcher, Vector2, Vector3, Shape, ShapeGeometry, Mesh, MeshBasicMaterial, DoubleSide, Box3, FrontSide, BufferGeometry } from 'three';
 import { Plane, Matrix4 } from 'three';
 import { EVENT_CHANGED, EVENT_ROOM_ATTRIBUTES_CHANGED, EVENT_MOVED, EVENT_UPDATED, EVENT_UPDATE_TEXTURES, EVENT_CORNER_ATTRIBUTES_CHANGED, EVENT_MODIFY_TEXTURE_ATTRIBUTE } from '../core/events.js';
 import { Region } from '../core/utils.js';
@@ -6,7 +6,6 @@ import { WallTypes, TEXTURE_DEFAULT_REPEAT, defaultFloorTexture, TEXTURE_PROPERT
 // import { / } from '../core/constants';
 import { Utils } from '../core/utils.js';
 import { HalfEdge } from './half_edge.js';
-import { BufferGeometry } from 'three/build/three.module';
 /** Default texture to be used if nothing is provided. */
 export const defaultRoomTexture = { url: 'rooms/textures/hardwood.png', scale: 400 };
 

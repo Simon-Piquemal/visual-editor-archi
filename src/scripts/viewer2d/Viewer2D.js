@@ -1,6 +1,6 @@
 import { Application, Graphics, Text } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
-import { Vector2, EventDispatcher, CompressedPixelFormat } from 'three';
+import { Vector2, EventDispatcher } from 'three';
 import { EVENT_NEW, EVENT_DELETED, EVENT_LOADED, EVENT_2D_SELECTED, EVENT_NEW_ROOMS_ADDED, EVENT_KEY_RELEASED, EVENT_KEY_PRESSED, EVENT_WALL_2D_CLICKED, EVENT_CORNER_2D_CLICKED, EVENT_ROOM_2D_CLICKED, EVENT_NOTHING_2D_SELECTED, EVENT_MOVED, EVENT_MODE_RESET, EVENT_EXTERNAL_FLOORPLAN_LOADED } from '../core/events';
 import { Grid2D } from './Grid2d';
 import { CornerView2D } from './CornerView2D';

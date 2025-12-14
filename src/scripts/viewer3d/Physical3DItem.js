@@ -1,8 +1,9 @@
 import {
     Mesh, FontLoader, Line, TextGeometry, BufferGeometry, Box3, MathUtils, Group, Object3D,
     ExtrudeBufferGeometry, BoundingBoxHelper, Vector3, VertexColors, ArrowHelper, AxesHelper,
-    SphereGeometry, MeshBasicMaterial, Matrix4, sRGBEncoding, LinearEncoding, PointLightHelper,
-    SpotLight, PointLight, SpotLightHelper,TextureLoader,RepeatWrapping,MeshPhongMaterial, Plane, CompressedPixelFormat
+    SphereGeometry, MeshBasicMaterial, Matrix4, SRGBColorSpace, LinearSRGBColorSpace, PointLightHelper,
+    SpotLight, PointLight, SpotLightHelper, TextureLoader, RepeatWrapping, MeshPhongMaterial, Plane, CompressedPixelFormat,
+    Vector2
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { EVENT_ITEM_LOADED, EVENT_ITEM_LOADING, EVENT_UPDATED, EVENT_PARAMETRIC_GEOMETRY_UPATED, EVENT_ITEM_REMOVED } from "../core/events";
@@ -12,7 +13,6 @@ import { FloorMaterial3D } from "../materials/FloorMaterial3D";
 import {ConfigurationHelper} from '../helpers/ConfigurationHelper';
 import { Configuration,shadowVisible } from '../core/configuration.js';
 import {gsap, Power0} from 'gsap';
-import { Vector2 } from "three/build/three.module";
 import { WallFloorItem } from "../items/wall_floor_item";
 import { InWallItem } from '../items/in_wall_item';
 import { InWallFloorItem } from '../items/in_wall_floor_item';
@@ -281,7 +281,7 @@ export class Physical3DItem extends Mesh {
                 let materials = (child.material.length) ? child.materials : [child.material];
                 materials.forEach((material) => {
                     if(material.map){
-                        material.map.encoding = sRGBEncoding;
+                        material.map.colorSpace = SRGBColorSpace;
                         material.map.anisotropy = 16;
                     }
                     if(material.opacity < 1.0-1e-6){

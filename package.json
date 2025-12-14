@@ -1,14 +1,12 @@
 {
     "name": "blueprint3d-js",
     "version": "3.0.1",
+    "type": "module",
     "description": "This is the core framework of Blueprint-js for creating floorplans in 2d and 3d",
     "scripts": {
-        "app-dev": "parcel src/index.html --dist-dir app/",
-        "for-git-demo-dev": "parcel src/index.html --dist-dir demo/ --public-url ./",
-        "app-production": "parcel build src/index.html --dist-dir app/ --no-source-maps --experimental-scope-hoisting",
-        "for-git-demo-production": "parcel build src/index.html --dist-dir demo/ --no-source-maps --public-url https://aalavandhaann.github.io/blueprint-js/demo/  --no-content-hash",
-        "frameworkonly-dev": "parcel build src/scripts/blueprint.js --global BP3DJS --no-source-maps --dist-dir bin/ --target browser --out-file bp3djs.js  --no-optimize  --no-content-hash",
-        "frameworkonly-production": "parcel build src/scripts/blueprint.js  --global BP3DJS --no-source-maps --dist-dir bin/ --target browser --out-file bp3djs.js  --no-content-hash",
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
         "docs": "esdoc"
     },
     "repository": {
@@ -21,6 +19,10 @@
         "url": "https://github.com/aalavandhaann/blueprint-js/issues"
     },
     "dependencies": {
+        "@heroicons/react": "^2.2.0",
+        "@react-three/csg": "^4.0.0",
+        "@react-three/drei": "^10.7.7",
+        "@react-three/fiber": "^9.4.2",
         "@thi.ng/geom-hull": "0.0.27",
         "alpha-shape": "^1.0.0",
         "bezier-js": "^2.4.0",
@@ -36,17 +38,24 @@
         "pixi-viewport": "^4.18.0",
         "pixi.js": "^6.4.2",
         "point-in-polygon": "^1.1.0",
+        "postcss": "^8.5.6",
         "quicksettings": "^3.0.1",
-        "three": "^0.148.0",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "three": "^0.182.0",
         "three-gltf-exporter": "0.0.1",
-        "three-reflector": "^1.0.2"
+        "three-reflector": "^1.0.2",
+        "zustand": "^5.0.9"
     },
     "devDependencies": {
         "@babel/core": "^7.18.6",
+        "@vitejs/plugin-react": "^5.1.2",
+        "autoprefixer": "^10.4.22",
         "buffer": "^6.0.3",
         "events": "^3.3.0",
-        "parcel": "^2.6.2",
         "process": "^0.11.10",
-        "querystring-es3": "^0.2.1"
+        "querystring-es3": "^0.2.1",
+        "tailwindcss": "^3.4.19",
+        "vite": "^7.2.7"
     }
 }
