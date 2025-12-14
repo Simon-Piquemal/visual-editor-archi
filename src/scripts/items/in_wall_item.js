@@ -14,7 +14,8 @@ export class InWallItem extends WallItem {
     }
 
     snapToWall(point, wall, wallEdge) {
-        console.log('[InWallItem.snapToWall] Starting with point:', point, 'wall:', wall, 'wallEdge:', wallEdge);
+        const itemName = this.__metadata?.itemName || 'unknown';
+        console.log('[InWallItem.snapToWall]', itemName, '| point:', point.x.toFixed(0), point.y.toFixed(0), point.z.toFixed(0));
 
         if (!wallEdge) {
             console.error('[InWallItem.snapToWall] ERROR: wallEdge is null!');
@@ -22,7 +23,7 @@ export class InWallItem extends WallItem {
         }
 
         let normal = wallEdge.normal;
-        console.log('[InWallItem.snapToWall] normal:', normal);
+        console.log('[InWallItem.snapToWall]', itemName, '| normal:', normal.x.toFixed(3), normal.y.toFixed(3), normal.z.toFixed(3));
 
         if (!normal) {
             console.error('[InWallItem.snapToWall] ERROR: wallEdge.normal is null!');
@@ -31,7 +32,6 @@ export class InWallItem extends WallItem {
 
         // Preserve the original Y position (height) - this is important for windows!
         const originalY = point.y;
-        console.log('[InWallItem.snapToWall] Original Y (height):', originalY);
 
         let plane = new Plane(normal);
         let normal2d = new Vector2(normal.x, normal.z);
@@ -39,10 +39,9 @@ export class InWallItem extends WallItem {
         let tempPoint = new Vector3();
         let matrix = new Matrix4();
 
-        console.log('[InWallItem.snapToWall] wallEdge.center:', wallEdge.center);
+        console.log('[InWallItem.snapToWall]', itemName, '| angle:', (angle * 180 / Math.PI).toFixed(1) + '°');
 
         point = this.__fitToWallBounds(point, wallEdge);
-        console.log('[InWallItem.snapToWall] After fitToWallBounds, point:', point);
 
         if (!wallEdge.center) {
             console.error('[InWallItem.snapToWall] ERROR: wallEdge.center is null!');
@@ -61,18 +60,17 @@ export class InWallItem extends WallItem {
         // Restore the original Y position after projection
         point.y = originalY;
 
-        point = point.clone().sub(normal.clone().multiplyScalar(wall.thickness * 0.5));
-        // point = this.__fitToWallBounds(point, wallEdge);
-
-        console.log('[InWallItem.snapToWall] Final point:', point, 'angle:', angle);
+        // For InWallItem (doors/windows), the item should be centered in the wall
+        // No offset needed - the item's visual representation handles the thickness
 
         this.rotation = new Vector3(0, angle, 0);
-        this.innerRotation=new Vector3(0, angle, 0);
+        this.innerRotation = new Vector3(0, angle, 0);
         this.position = point;
         this.__currentWallSnapPoint = point.clone();
         this.__currentWallNormal = normal.clone();
         this.__addToAWall(wall, wallEdge);
 
-        console.log('[InWallItem.snapToWall] Complete. Item position:', this.position);
+        console.log('[InWallItem.snapToWall]', itemName, '| FINAL pos:', point.x.toFixed(0), point.y.toFixed(0), point.z.toFixed(0),
+            '| rot:', (angle * 180 / Math.PI).toFixed(1) + '°');
     }
 }

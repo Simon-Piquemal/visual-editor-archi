@@ -113,7 +113,7 @@ export class Viewer2D extends Application {
     constructor(canvasHolder, floorplan, options) {
         const { pixiAppOptions, pixiViewportOptions } = options;
         const pixiDefalultAppOpts = {
-            width: 512, 
+            width: 512,
             height: 512,
             resolution: window.devicePixelRatio || 2,
             antialias: true,
@@ -123,19 +123,19 @@ export class Viewer2D extends Application {
         super(Object.assign(pixiDefalultAppOpts, pixiAppOptions));
         this.__eventDispatcher = new EventDispatcher();
 
-        let opts = { 
-            'corner-radius': 20, 
+        let opts = {
+            'corner-radius': 20,
             'boundary-point-radius': 5.0,
             'boundary-line-thickness': 1.0,
-            'boundary-point-color':'#D3D3D3',
-            'boundary-line-color':'#F3F3F3',
-            pannable: true, 
-            zoomable: true, 
-            dimlinecolor: '#3EDEDE', 
-            dimarrowcolor: '#000000', 
-            dimtextcolor: '#000000', 
-            scale: true, 
-            rotate: true, 
+            'boundary-point-color': '#D3D3D3',
+            'boundary-line-color': '#F3F3F3',
+            pannable: true,
+            zoomable: true,
+            dimlinecolor: '#3EDEDE',
+            dimarrowcolor: '#000000',
+            dimtextcolor: '#000000',
+            scale: true,
+            rotate: true,
             translate: true,
             resize: true,
         };
@@ -201,7 +201,7 @@ export class Viewer2D extends Application {
 
         this.__snapToGrid = false;
         this.__keyboard = new KeyboardListener2D();
-        this.__keyListenerEvent = this.__keyListener.bind(this);        
+        this.__keyListenerEvent = this.__keyListener.bind(this);
 
         let origin = new Graphics();
         this.__floorplanElementsHolder = new Graphics();
@@ -251,7 +251,7 @@ export class Viewer2D extends Application {
         this.__canvasHolder.appendChild(this.view);
 
         this.__floorplanContainer.drag().pinch().wheel();
-        
+
         if (!this.__options.pannable) {
             this.__floorplanContainer.plugins.pause('drag');
         }
@@ -301,17 +301,17 @@ export class Viewer2D extends Application {
         this.__center();
     }
 
-    __drawBoundary(){
+    __drawBoundary() {
         // return;
-        if(this.__boundaryRegion2D){
+        if (this.__boundaryRegion2D) {
             this.__boundaryRegion2D.remove();
         }
 
-        if(this.__floorplan.boundary){
-            if(this.__floorplan.boundary.isValid){
+        if (this.__floorplan.boundary) {
+            if (this.__floorplan.boundary.isValid) {
                 this.__boundaryRegion2D = new BoundaryView2D(this.__floorplan, this.__options, this.__floorplan.boundary);
                 this.__boundaryHolder.addChild(this.__boundaryRegion2D);
-            }            
+            }
         }
     }
 
@@ -329,7 +329,7 @@ export class Viewer2D extends Application {
     }
 
     switchMode(mode) {
-        if(this.__mode === floorplannerModes.EDIT_ISLANDS && mode !== floorplannerModes.EDIT_ISLANDS){
+        if (this.__mode === floorplannerModes.EDIT_ISLANDS && mode !== floorplannerModes.EDIT_ISLANDS) {
             this.__floorplan.update();
         }
         switch (mode) {
@@ -428,7 +428,7 @@ export class Viewer2D extends Application {
             let existingCorners = this.__floorplan.corners.slice(0);
             let existingRooms = this.__floorplan.rooms.slice(0);
             // This creates the corner already
-            let corner = this.__floorplan.newCorner(cmCo.x, cmCo.y);            
+            let corner = this.__floorplan.newCorner(cmCo.x, cmCo.y);
 
             // further create a newWall based on the newly inserted corners
             // (one in the above line and the other in the previous mouse action
@@ -445,7 +445,7 @@ export class Viewer2D extends Application {
                 this.switchMode(floorplannerModes.MOVE);
             }
 
-            if(existingRooms.length != this.__floorplan.rooms.length){
+            if (existingRooms.length != this.__floorplan.rooms.length) {
                 this.__tempWall.visible = false;
                 this.__lastNode = null;
                 this.switchMode(floorplannerModes.MOVE);
@@ -532,14 +532,14 @@ export class Viewer2D extends Application {
         }
     }
 
-    __center(){
+    __center() {
         let floorplanCenter = this.__floorplan.getCenter();
         let zoom = this.__floorplanContainer.scale.x;
-        let windowSize = new Vector2(this.__currentWidth, this.__currentHeight); 
+        let windowSize = new Vector2(this.__currentWidth, this.__currentHeight);
         let bounds = Dimensioning.cmToPixel(Configuration.getNumericValue(viewBounds)) * zoom;
         // console.log(windowSize.x, windowSize.y);
-        let x = (windowSize.x * 0.5)-(floorplanCenter.x*0.5);// - (bounds*0.5);
-        let y = (windowSize.y * 0.5)-(floorplanCenter.z*0.5);// - (bounds*0.5);
+        let x = (windowSize.x * 0.5) - (floorplanCenter.x * 0.5);// - (bounds*0.5);
+        let y = (windowSize.y * 0.5) - (floorplanCenter.z * 0.5);// - (bounds*0.5);
         this.__floorplanContainer.x = x;
         this.__floorplanContainer.y = y;
         this.__tempWallHolder.x = x;
@@ -552,7 +552,7 @@ export class Viewer2D extends Application {
         let bounds = Dimensioning.cmToPixel(Configuration.getNumericValue(viewBounds));// * zoom;
         let maxZoomOut = Math.max(window.innerWidth, window.innerHeight) / bounds;
         zoom = (zoom < maxZoomOut) ? maxZoomOut : (zoom > 60) ? 60 : zoom;
-        
+
         this.__floorplanContainer.scale.x = this.__floorplanContainer.scale.y = zoom;
         this.__tempWallHolder.scale.x = this.__tempWallHolder.scale.y = zoom;
 
@@ -564,19 +564,19 @@ export class Viewer2D extends Application {
         let bounds = Dimensioning.cmToPixel(Configuration.getNumericValue(viewBounds)) * zoom;
 
         let xy = new Vector2(this.__floorplanContainer.x, this.__floorplanContainer.y);
-        let topleft = new Vector2((-(bounds*0.5)), (-(bounds*0.5)));
-        let bottomright = new Vector2(((bounds*0.5)), ((bounds*0.5)));
-        
+        let topleft = new Vector2((-(bounds * 0.5)), (-(bounds * 0.5)));
+        let bottomright = new Vector2(((bounds * 0.5)), ((bounds * 0.5)));
+
         // let windowSize = new Vector2(window.innerWidth, window.innerHeight);
-        let windowSize = new Vector2(this.__currentWidth, this.__currentHeight);        
-      
+        let windowSize = new Vector2(this.__currentWidth, this.__currentHeight);
+
         let xValue = Math.min(-topleft.x, xy.x);
         let yValue = Math.min(-topleft.y, xy.y);
 
-        xValue = Math.max(windowSize.x-bottomright.x, xValue);
-        yValue = Math.max(windowSize.y-bottomright.y, yValue);
-        
-        
+        xValue = Math.max(windowSize.x - bottomright.x, xValue);
+        yValue = Math.max(windowSize.y - bottomright.y, yValue);
+
+
         this.__floorplanContainer.x = this.__tempWallHolder.x = xValue;
         this.__floorplanContainer.y = this.__tempWallHolder.y = yValue;
         // console.log('---------------------------------------------');
@@ -691,9 +691,9 @@ export class Viewer2D extends Application {
         let heightMargin = this.__canvasHolder.offsetTop;
         let widthMargin = this.__canvasHolder.offsetLeft;
 
-        let w = (this.__options.resize)? window.innerWidth - widthMargin : this.__canvasHolder.clientWidth;
-        let h = (this.__options.resize)? window.innerHeight - heightMargin : this.__canvasHolder.clientHeight;
-        
+        let w = (this.__options.resize) ? window.innerWidth - widthMargin : this.__canvasHolder.clientWidth;
+        let h = (this.__options.resize) ? window.innerHeight - heightMargin : this.__canvasHolder.clientHeight;
+
         this.__currentWidth = w;
         this.__currentHeight = h;
 
@@ -727,6 +727,22 @@ export class Viewer2D extends Application {
 
     get viewportPosition() {
         return { x: this.__floorplanContainer.x, y: this.__floorplanContainer.y };
+    }
+
+    /**
+     * Convert screen coordinates (relative to the viewer container) to world coordinates in cm
+     * @param {number} screenX - X position relative to viewer container
+     * @param {number} screenY - Y position relative to viewer container  
+     * @returns {{x: number, y: number}} World position in cm
+     */
+    screenToCm(screenX, screenY) {
+        // Use pixi-viewport's toWorld to convert to local coordinates
+        const worldPoint = this.__floorplanContainer.toWorld(screenX, screenY);
+        // Convert from pixels to cm
+        return {
+            x: Dimensioning.pixelToCm(worldPoint.x),
+            y: Dimensioning.pixelToCm(worldPoint.y)
+        };
     }
 
     dispose() {

@@ -4,6 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useViewerStore } from './store';
 import { ItemStatistics3D } from './ItemStatistics3D';
+import { EVENT_UPDATED } from '../core/events';
 
 function BoxHelper({ size, visible, selected }) {
     const geometry = useMemo(() => {
@@ -89,19 +90,22 @@ export function Physical3DItem({ itemModel, onSelect, onDeselect }) {
     const [loadedScene, setLoadedScene] = useState(null);
     const [size, setSize] = useState(new THREE.Vector3(1, 1, 1));
     const [center, setCenter] = useState(new THREE.Vector3());
+    // Force update counter to trigger re-render when item transforms change
+    const [updateCount, setUpdateCount] = useState(0);
 
     const selectedItem = useViewerStore((state) => state.selectedItem);
     const selectItem = useViewerStore((state) => state.selectItem);
 
     const isSelected = selectedItem === meshRef.current;
 
+    // These memos now depend on updateCount to force recalculation
     const position = useMemo(() => {
         return [itemModel.position.x, itemModel.position.y, itemModel.position.z];
-    }, [itemModel.position]);
+    }, [itemModel.position, updateCount]);
 
     const innerRotation = useMemo(() => {
         return itemModel.innerRotation || new THREE.Euler(0, 0, 0);
-    }, [itemModel.innerRotation]);
+    }, [itemModel.innerRotation, updateCount]);
 
     const halfSize = useMemo(() => {
         return itemModel.halfSize || new THREE.Vector3(50, 50, 50);
@@ -139,6 +143,7 @@ export function Physical3DItem({ itemModel, onSelect, onDeselect }) {
     useEffect(() => {
         const handleUpdate = (evt) => {
             if (meshRef.current) {
+                // Update position directly on the mesh for immediate visual feedback
                 if (evt.property === 'position') {
                     meshRef.current.position.set(
                         itemModel.position.x,
@@ -150,11 +155,16 @@ export function Physical3DItem({ itemModel, onSelect, onDeselect }) {
                     meshRef.current.visible = itemModel.visible;
                 }
             }
+            // Force re-render to update memoized values (position, rotation, etc.)
+            if (evt.property === 'position' || evt.property === 'innerRotation') {
+                setUpdateCount(c => c + 1);
+            }
         };
 
-        itemModel.addEventListener?.('EVENT_UPDATED', handleUpdate);
+        // Use the EVENT_UPDATED constant, not a string
+        itemModel.addEventListener?.(EVENT_UPDATED, handleUpdate);
         return () => {
-            itemModel.removeEventListener?.('EVENT_UPDATED', handleUpdate);
+            itemModel.removeEventListener?.(EVENT_UPDATED, handleUpdate);
         };
     }, [itemModel]);
 

@@ -37,27 +37,31 @@ export function App() {
         if (!viewer2dEl) return;
 
         const rect = viewer2dEl.getBoundingClientRect();
-        const dropX = e.clientX - rect.left;
-        const dropY = e.clientY - rect.top;
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
 
-        // Convert screen coordinates to world coordinates using the floorplanner
+        // Convert screen coordinates to world coordinates in cm using the floorplanner's method
         const floorplanner = blueprint.floorplanner;
-        const viewportContainer = floorplanner.viewportContainer;
 
-        if (!viewportContainer) return;
+        if (!floorplanner.screenToCm) {
+            console.error('[handleDrop] floorplanner.screenToCm not available');
+            return;
+        }
 
-        // Convert to world coordinates (taking into account pan and zoom)
-        const worldX = (dropX - viewportContainer.x) / viewportContainer.scale.x;
-        const worldY = (dropY - viewportContainer.y) / viewportContainer.scale.y;
+        // Use the floorplanner's screenToCm method which handles both viewport transform and pixel/cm conversion
+        const worldCm = floorplanner.screenToCm(screenX, screenY);
 
-        // Add the item at the drop position
+        console.log('[handleDrop] screenPos:', screenX.toFixed(0), screenY.toFixed(0),
+            '| worldCm:', worldCm.x.toFixed(0), worldCm.y.toFixed(0));
+
+        // Add the item at the drop position (in cm)
         const helper = blueprint.floorplanningHelper;
         let success = false;
 
         if (itemType === 'door') {
-            success = helper.addDoorAtPosition(worldX, worldY, 7);
+            success = helper.addDoorAtPosition(worldCm.x, worldCm.y, 7);
         } else if (itemType === 'window') {
-            success = helper.addWindowAtPosition(worldX, worldY);
+            success = helper.addWindowAtPosition(worldCm.x, worldCm.y);
         }
 
         if (!success) {

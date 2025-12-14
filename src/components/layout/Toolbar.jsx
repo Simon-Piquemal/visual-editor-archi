@@ -175,16 +175,16 @@ export function Toolbar() {
                     {/* Door & Window - Drag & Drop */}
                     <div className="flex items-center gap-2 bg-background rounded-lg px-2 py-1">
                         <span className="text-xs text-text-secondary">Glisser:</span>
-                        <DraggableItem 
-                            type="door" 
-                            icon={DoorIcon} 
-                            label="Porte" 
+                        <DraggableItem
+                            type="door"
+                            icon={DoorIcon}
+                            label="Porte"
                             blueprint={blueprint}
                         />
-                        <DraggableItem 
-                            type="window" 
-                            icon={WindowIcon} 
-                            label="Fenêtre" 
+                        <DraggableItem
+                            type="window"
+                            icon={WindowIcon}
+                            label="Fenêtre"
                             blueprint={blueprint}
                         />
                     </div>

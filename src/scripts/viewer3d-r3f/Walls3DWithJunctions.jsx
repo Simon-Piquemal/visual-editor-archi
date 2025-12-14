@@ -3,7 +3,7 @@
  * Renders all walls with proper junction handling using CSG
  * Creates clean wall intersections and supports door/window cutouts
  */
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Geometry, Base, Subtraction } from '@react-three/csg';
 import * as THREE from 'three';
@@ -12,6 +12,7 @@ import {
     findJunctions,
     calculateJunctionIntersections,
 } from './utils/wallJunctions';
+import { EVENT_NEW_ITEM, EVENT_ITEM_REMOVED } from '../core/events';
 
 const DEFAULT_WALL_THICKNESS = 10;
 
@@ -168,34 +169,66 @@ function assignMaterialGroups(geometry) {
 
 /**
  * Create cutout geometry for a wall item (door/window)
- * Converts world coordinates to local wall coordinates
+ * 
+ * Strategy: Project the item position onto the wall centerline,
+ * then calculate how far along the wall it is.
+ * 
+ * Wall local coordinate system:
+ * - X: 0 to length (along wall centerline)
+ * - Y: 0 to height (vertical)
+ * - Z: perpendicular to wall (0 = center)
  */
-function createCutoutGeometry(item, wallStart, wallRotation, wallThickness) {
+function createCutoutGeometry(item, wall, wallStart, wallEnd, wallThickness) {
     const pos = item.position;
     const halfSize = item.halfSize;
 
     // Create box geometry for the cutout
-    const width = halfSize.x * 2;
-    const height = halfSize.y * 2;
-    // Use wall thickness + extra margin for clean cut
-    const depth = wallThickness + 20;
+    const width = halfSize.x * 2 + 4;
+    const height = halfSize.y * 2 + 4;
+    const depth = wallThickness * 3;
 
     const geometry = new THREE.BoxGeometry(width, height, depth);
 
-    // Convert item world position to wall local coordinates
-    // Wall is positioned at wallStart and rotated by wallRotation
-    const worldX = pos.x - wallStart.x;
-    const worldZ = pos.z - wallStart.y; // wallStart.y is actually Z in 3D
-    
-    // Rotate back by wall rotation to get local coordinates
-    const cos = Math.cos(wallRotation);
-    const sin = Math.sin(wallRotation);
-    const localX = worldX * cos + worldZ * sin;
-    const localZ = -worldX * sin + worldZ * cos;
+    // Wall centerline in 2D plan coordinates
+    // wallStart.x, wallStart.y = start corner (plan coords where Y is 3D Z)
+    // wallEnd.x, wallEnd.y = end corner
+    const wallVec = {
+        x: wallEnd.x - wallStart.x,
+        y: wallEnd.y - wallStart.y
+    };
+    const wallLength = Math.sqrt(wallVec.x * wallVec.x + wallVec.y * wallVec.y);
 
-    return { 
-        geometry, 
-        position: { x: localX, y: pos.y, z: localZ } 
+    // Normalize wall direction
+    const wallDir = {
+        x: wallVec.x / wallLength,
+        y: wallVec.y / wallLength
+    };
+
+    // Item position in 2D plan coordinates (pos.x -> plan X, pos.z -> plan Y)
+    const itemPlan = { x: pos.x, y: pos.z };
+
+    // Vector from wall start to item
+    const startToItem = {
+        x: itemPlan.x - wallStart.x,
+        y: itemPlan.y - wallStart.y
+    };
+
+    // Project onto wall direction to get distance along wall (local X)
+    const localX = startToItem.x * wallDir.x + startToItem.y * wallDir.y;
+
+    // Perpendicular distance (local Z) - cross product gives signed distance
+    const localZ = startToItem.x * (-wallDir.y) + startToItem.y * wallDir.x;
+
+    console.log('[CUTOUT]', item.metadata?.itemName || 'item',
+        '| pos3D:', pos.x.toFixed(0), pos.y.toFixed(0), pos.z.toFixed(0),
+        '| wallStart:', wallStart.x.toFixed(0), wallStart.y.toFixed(0),
+        '| wallEnd:', wallEnd.x.toFixed(0), wallEnd.y.toFixed(0),
+        '| localX:', localX.toFixed(0), '| localZ:', localZ.toFixed(0),
+        '| wallLen:', wallLength.toFixed(0));
+
+    return {
+        geometry,
+        position: { x: localX, y: pos.y, z: localZ }
     };
 }
 
@@ -207,11 +240,29 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
     const meshRef = useRef();
     const { camera } = useThree();
     const [opacity, setOpacity] = useState(1);
+    // Track item count to force re-render when items are added/removed
+    const [itemCount, setItemCount] = useState(wall.inWallItems?.length || 0);
 
     // Wall properties
     const start = wall.start;
     const end = wall.end;
     const wallId = wall.id || wall.uuid;
+
+    // Listen for wall item changes
+    useEffect(() => {
+        const handleItemChange = () => {
+            setItemCount(wall.inWallItems?.length || 0);
+        };
+
+        // EVENT_NEW_ITEM and EVENT_ITEM_REMOVED are dispatched by wall
+        wall.addEventListener?.(EVENT_NEW_ITEM, handleItemChange);
+        wall.addEventListener?.(EVENT_ITEM_REMOVED, handleItemChange);
+
+        return () => {
+            wall.removeEventListener?.(EVENT_NEW_ITEM, handleItemChange);
+            wall.removeEventListener?.(EVENT_ITEM_REMOVED, handleItemChange);
+        };
+    }, [wall]);
 
     // Calculate wall geometry with junctions
     const { geometry, position, rotation, wallItems, normal } = useMemo(() => {
@@ -259,7 +310,7 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
         // If wall has a frontEdge (room on front side), normal points to front (+Z local)
         // If wall only has backEdge, normal points to back (-Z local)
         let wallNormal;
-        
+
         if (wall.frontEdge && !wall.backEdge) {
             // Room is on the front side - normal points outward from room
             wallNormal = new THREE.Vector3(-dy, 0, dx).normalize();
@@ -281,7 +332,7 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
             wallItems: items,
             normal: wallNormal,
         };
-    }, [wall, start, end, wallId, junctionData]);
+    }, [wall, start, end, wallId, junctionData, itemCount]);
 
     // Check if wall is internal (has rooms on both sides)
     // Internal walls should always be fully visible
@@ -319,7 +370,7 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
     });
 
     // Materials - use DoubleSide so walls are visible from both sides
-    // Opacity controlled by camera position
+    // Recreate materials when opacity changes (needed for CSG which may clone materials)
     const wallMaterials = useMemo(() => {
         const frontMat = new THREE.MeshStandardMaterial({
             color: '#ffffff',
@@ -327,6 +378,7 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
             roughness: 0.9,
             metalness: 0.0,
             transparent: true,
+            opacity: opacity,
         });
         const backMat = new THREE.MeshStandardMaterial({
             color: '#f0f0f0',
@@ -334,6 +386,7 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
             roughness: 0.9,
             metalness: 0.0,
             transparent: true,
+            opacity: opacity,
         });
         const sideMat = new THREE.MeshStandardMaterial({
             color: '#e0e0e0',
@@ -341,41 +394,37 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
             roughness: 0.9,
             metalness: 0.0,
             transparent: true,
+            opacity: opacity,
         });
 
         return [frontMat, backMat, sideMat];
-    }, []);
-
-    // Update material opacity when state changes
-    useFrame(() => {
-        wallMaterials.forEach(mat => {
-            if (mat.opacity !== opacity) {
-                mat.opacity = opacity;
-                mat.needsUpdate = true;
-            }
-        });
-    });
+    }, [opacity]);
 
     if (!geometry) return null;
 
+    // Quantize opacity to avoid too many CSG rebuilds (only rebuild at 0.05 and 1.0)
+    const quantizedOpacity = opacity < 0.5 ? 0.05 : 1.0;
+
     // If there are wall items (doors/windows), use CSG for cutouts
     if (wallItems && wallItems.length > 0) {
-        // Get wall properties for cutout calculation
-        const dx = end.x - start.x;
-        const dy = end.y - start.y;
-        const wallRotation = Math.atan2(dy, dx);
         const wallThickness = wall.thickness || DEFAULT_WALL_THICKNESS;
 
         return (
             <group ref={groupRef} position={position} rotation={rotation}>
-                <mesh castShadow receiveShadow>
+                <mesh
+                    ref={meshRef}
+                    castShadow
+                    receiveShadow
+                    key={`wall-csg-${wallId}-${quantizedOpacity}`}
+                >
                     <Geometry useGroups>
                         <Base geometry={geometry} material={wallMaterials} />
                         {wallItems.map((item, index) => {
                             const { geometry: cutoutGeom, position: itemPos } = createCutoutGeometry(
-                                item, 
-                                start, 
-                                wallRotation, 
+                                item,
+                                wall,
+                                start,
+                                end,
                                 wallThickness
                             );
                             return (
@@ -398,6 +447,7 @@ function WallWithJunction({ wall, junctionData, scene, occludedWalls }) {
     return (
         <group ref={groupRef} position={position} rotation={rotation}>
             <mesh
+                ref={meshRef}
                 geometry={geometry}
                 material={wallMaterials}
                 castShadow

@@ -233,7 +233,6 @@ export class FloorPlannerHelper {
      */
     findClosestWall(cmX, cmY) {
         // Ensure floorplan is updated and edges exist
-        console.log('[findClosestWall] Updating floorplan to ensure edges exist...');
         this.__floorplan.update();
 
         let walls = this.__floorplan.walls;
@@ -242,12 +241,11 @@ export class FloorPlannerHelper {
         let closestProjection = 0;
         let closestEdge = null;
 
-        console.log('[findClosestWall] Searching among', walls.length, 'walls for position:', cmX, cmY);
+        console.log('[findClosestWall] Looking for wall near:', cmX.toFixed(0), cmY.toFixed(0), '| walls:', walls.length);
 
         let point = new Vector2(cmX, cmY);
 
         for (let wall of walls) {
-            console.log('[findClosestWall] Wall:', wall.id, 'frontEdge:', wall.frontEdge, 'backEdge:', wall.backEdge);
             let wallStart = wall.start.location;
             let wallEnd = wall.end.location;
             let wallVec = wallEnd.clone().sub(wallStart);
@@ -287,11 +285,14 @@ export class FloorPlannerHelper {
         }
 
         if (!closestWall || !closestEdge) {
-            console.log('[findClosestWall] No wall or edge found! closestWall:', closestWall, 'closestEdge:', closestEdge);
+            console.log('[findClosestWall] No wall or edge found!');
             return null;
         }
 
-        console.log('[findClosestWall] Found closest wall:', closestWall.id, 'distance:', closestDistance);
+        console.log('[findClosestWall] Found wall:', closestWall.id,
+            '| start:', closestWall.start.location.x.toFixed(0), closestWall.start.location.y.toFixed(0),
+            '| end:', closestWall.end.location.x.toFixed(0), closestWall.end.location.y.toFixed(0),
+            '| dist:', closestDistance.toFixed(0));
 
         // Calculate the exact position on the wall
         let wallStart = closestWall.start.location;
