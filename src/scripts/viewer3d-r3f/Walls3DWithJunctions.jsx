@@ -377,7 +377,7 @@ function JunctionFill({ points, height }) {
         // Points are in world XY coordinates, we need to convert to XZ for 3D
         // Shape uses 2D coordinates, then we rotate to make it horizontal
         const shape = new THREE.Shape();
-        
+
         // Use x and y from the points (which correspond to world X and Z)
         shape.moveTo(points[0].x, -points[0].y);
         for (let i = 1; i < points.length; i++) {
@@ -444,7 +444,7 @@ export function Walls3DWithJunctions({ walls = [], occludedWalls = false }) {
                 // Get the height from connected walls - find the actual wall object
                 const connectedWallData = junction.connectedWalls[0];
                 let height = 250; // Default height
-                
+
                 if (connectedWallData) {
                     const wallId = connectedWallData.wall?.id;
                     const wallObj = walls.find(w => (w.id || w.uuid) === wallId);
